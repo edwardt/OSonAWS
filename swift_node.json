@@ -29,13 +29,19 @@
         "Type": "String",
         "MinLength": "1",
         "MaxLength": "64",
-        "AllowedPattern" : "[a-zA-Z][a-zA-Z]*",
+        "AllowedPattern" : "[a-zA-Z0-9]*",
         "ConstraintDescription" : "must begin with a letter and contain only alpha characters."
       },
       
 		"SwiftNodeDiskSize": {
 			"Default": "1",
 		  "Description" : "Dedicated disk for swift",
+		  "Type": "String"
+		},
+      
+		"SwiftNodeNumber": {
+			"Default": "3",
+		  "Description" : "Number of Swift nodes",
 		  "Type": "String"
 		}
       
@@ -122,25 +128,12 @@
 		},
 		"SwiftNodeWaitCondition" : {
 			"Type" : "AWS::CloudFormation::WaitCondition",
-			"DependsOn" : "SwiftNodeServer",
+			"DependsOn" : "SwiftNodesGroup",
 			"Properties" : {
 			"Handle" : {"Ref" : "SwiftNodeWaitHandle"},
 			"Timeout" : "1200"
 			}
 		},	  
-
-		
-		"SwiftNodeIPAddress" : {
-			"Type" : "AWS::EC2::EIP"
-		},
-
-		"SwiftNodeIPAssoc" : {
-			"Type" : "AWS::EC2::EIPAssociation",
-			"Properties" : {
-				"InstanceId" : { "Ref" : "SwiftNodeServer" },
-				"EIP" : { "Ref" : "SwiftNodeIPAddress" }
-			}
-		},
 		
 		"SwiftNodeSecurityGroup" : {
 			"Type" : "AWS::EC2::SecurityGroup",
@@ -152,21 +145,23 @@
 				]
 			}
 		},
-		
-		
 
-	    "SwiftNodeDisk" : {
-	      "Type" : "AWS::EC2::Volume",
-	      "Properties" : {
-	        "Size" : {"Ref" : "SwiftNodeDiskSize"},
-	        "AvailabilityZone" : { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "TestAz" ]}
-	      }
-	  },
+		
+	    "SwiftNodesGroup" : {
+	        "Type" : "AWS::AutoScaling::AutoScalingGroup",
+	        "Properties" : {
+	          "AvailabilityZones" : { "Fn::GetAZs" : "" },
+	          "LaunchConfigurationName" : { "Ref" : "SwiftNodeServer" },
+	          "MinSize" : "3",
+	          "MaxSize" : "10",
+	          "DesiredCapacity" : { "Ref" : "SwiftNodeNumber" }
+	        }
+	      },
 		
 		
 		
     "SwiftNodeServer": {
-      "Type": "AWS::EC2::Instance",
+      "Type": "AWS::AutoScaling::LaunchConfiguration",
       "Metadata" : {
         "AWS::CloudFormation::Init" : {
 			"configSets" : {
@@ -318,12 +313,9 @@
 			"ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" },
                     { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" }, "Arch" ] } ] },
 			"SecurityGroups" : [ {"Ref" : "SwiftNodeSecurityGroup"} ],
-			"Monitoring" : "false",
-			"Volumes" : [ 
-			             { "VolumeId" : { "Ref" : "SwiftNodeDisk" },
-			               "Device" : "/dev/sdk"
-			             }
-			           ],
+			"BlockDeviceMappings" : [
+			    {"DeviceName" : "/dev/sdb", "Ebs": { "VolumeSize": { "Ref" : "SwiftNodeDiskSize" }}}
+			    	],
 			"UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
 				"#! /bin/bash\n",
 
