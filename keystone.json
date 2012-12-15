@@ -264,12 +264,12 @@
 							"function get_id () {\n",
 							" echo `\"$@\" | awk '/ id / { print $4 }'`\n",
 							"}\n",
-							"ADMIN_PASSWORD=${ADMIN_PASSWORD:-secrete}\n",
+							"ADMIN_PASSWORD=${ADMIN_PASSWORD:-", { "Ref" : "KeystoneSwiftUserPassword" }, "}\n",
 							"SERVICE_PASSWORD=${SERVICE_PASSWORD:-$ADMIN_PASSWORD}\n",
 							"SERVICE_TENANT_NAME=${SERVICE_TENANT_NAME:-service}\n",
 							"SERVICE_HOST='127.0.0.1'\n",
 							
-							"export SERVICE_TOKEN='E5VfT9rgAc'\n",
+							"export SERVICE_TOKEN='", { "Ref" : "KeystoneAdminToken" }, "'\n",
 							"export SERVICE_ENDPOINT='http://0.0.0.0:35357/v2.0'\n",
 							
 							"SERVICE_TENANT=$(get_id keystone tenant-create --name=\"$SERVICE_TENANT_NAME\")\n",
