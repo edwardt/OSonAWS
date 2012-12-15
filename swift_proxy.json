@@ -21,7 +21,20 @@
       "Default" : "m1.small",
       "AllowedValues" : [ "t1.micro","m1.small","m1.medium","m1.large","m1.xlarge","m2.xlarge","m2.2xlarge","m2.4xlarge","c1.medium","c1.xlarge","cc1.4xlarge","cc2.8xlarge","cg1.4xlarge"],
       "ConstraintDescription" : "must be a valid EC2 instance type."
-    }    
+    },
+    
+    
+    "SwiftHashPathPrefix": {
+        "Default": "3e3f6364f0d7f06cf8dc50430c3cb4ef",
+        "Description" : "Swift Hash Prefix",
+        "Type": "String",
+        "MinLength": "1",
+        "MaxLength": "64",
+        "AllowedPattern" : "[a-zA-Z0-9]*",
+        "ConstraintDescription" : "must begin with a letter and contain only alpha characters."
+      },
+      
+      
   },
   
 "Mappings" : {
@@ -148,8 +161,16 @@
 					   "/opt/osonaws/setup_swiftproxy" : {
 							"content" : { "Fn::Join" : ["", [
 								"#!/bin/bash -v\n",
+								
+								"mkdir -p /etc/swift\n",
+								"chown -R swift:swift /etc/swift/\n",
+								"cat << EOF > /etc/swift/swift.conf\n",
+								"[swift-hash]\n",
+								"swift_hash_path_suffix = ", { "Ref" : "SwiftHashPathPrefix" }, " \n",
+								"EOF\n",
+								
 								"cd /etc/swift\n",
-								"openssl req -new -x509 -nodes -out cert.crt -keyout cert.key\n",								
+								"#openssl req -new -x509 -nodes -out cert.crt -keyout cert.key\n",								
 								"cat << EOF > /etc/swift/proxy-server.conf\n",
 								"[DEFAULT]\n",
 								"bind_port = 8888\n",
@@ -211,7 +232,7 @@
 								
 								"swift-ring-builder account.builder rebalance\n",
 								"swift-ring-builder container.builder rebalance\n",
-								"swift-ring-builder object.builder rebalance\n",
+								"swift-ring-builder object.builder rebalance\n"
 								]]},
 							"mode"  : "000700",
 							"owner" : "ubuntu",
