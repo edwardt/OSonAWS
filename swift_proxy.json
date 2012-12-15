@@ -1,0 +1,261 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+
+  "Description" : "OpenStack on Amazon web service template",
+
+  "Parameters" : {
+
+    "KeyName" : {
+      "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the instances",
+      "Default" : "cloudy",
+      "Type" : "String",
+      "MinLength": "1",
+      "MaxLength": "64",
+      "AllowedPattern" : "[-_ a-zA-Z0-9]*",
+      "ConstraintDescription" : "can contain only alphanumeric characters, spaces, dashes and underscores."
+    },
+
+    "InstanceType" : {
+      "Description" : "Instance type",
+      "Type" : "String",
+      "Default" : "m1.small",
+      "AllowedValues" : [ "t1.micro","m1.small","m1.medium","m1.large","m1.xlarge","m2.xlarge","m2.2xlarge","m2.4xlarge","c1.medium","c1.xlarge","cc1.4xlarge","cc2.8xlarge","cg1.4xlarge"],
+      "ConstraintDescription" : "must be a valid EC2 instance type."
+    }    
+  },
+  
+"Mappings" : {
+		
+		"AWSInstanceType2Arch" : {
+			"t1.micro"    : { "Arch" : "64" },
+			"m1.small"    : { "Arch" : "64" },
+			"m1.large"    : { "Arch" : "64" },
+			"m1.xlarge"   : { "Arch" : "64" },
+			"m2.xlarge"   : { "Arch" : "64" },
+			"m2.2xlarge"  : { "Arch" : "64" },
+			"m2.4xlarge"  : { "Arch" : "64" },
+			"c1.medium"   : { "Arch" : "32" },
+			"c1.xlarge"   : { "Arch" : "64" },
+			"cc1.4xlarge" : { "Arch" : "64" }
+		},
+		"AWSRegionArch2AMI" : {
+			"us-east-1"      : { "32" : "ami-a0ba68c9", "64" : "ami-baba68d3" },
+			"us-west-1"      : { "32" : "ami-63a8f126", "64" : "ami-6da8f128" },
+			"us-west-2"      : { "32" : "ami-ac05889c", "64" : "ami-ae05889e" },
+			"eu-west-1"      : { "32" : "ami-a99491dd", "64" : "ami-ab9491df" },
+			"sa-east-1"      : { "32" : "ami-b473aca9", "64" : "ami-b673acab" },
+			"ap-southeast-1" : { "32" : "ami-5c96d20e", "64" : "ami-e88acaba" },
+			"ap-northeast-1" : { "32" : "ami-0e299f0f", "64" : "ami-22ad1223" }
+		}
+	},
+	
+  "Resources" : {
+
+	  "OpenStackUser" : {
+			"Type" : "AWS::IAM::User",
+			"Properties" : {
+				"Path": "/",
+				"Policies": [{
+					"PolicyName": "DefaultStack",
+					"PolicyDocument": {
+						"Statement": [
+							{
+								"Sid": "CloudformationPolicy",
+								"Effect":"Allow",
+								"Action":"cloudformation:DescribeStackResource",
+								"Resource":"*"
+							},
+							{
+								"Sid": "CloudWatchPolicy",
+								"Effect"   : "Allow",
+								"Action"   : "cloudwatch:PutMetricData",
+								"Resource" : "*"
+							}
+						]
+					}
+				}]
+			}
+		},
+		
+		"OpenstackUserAccessKey" : {
+			"Type" : "AWS::IAM::AccessKey",
+			"Properties" : {
+				"UserName" : {"Ref": "OpenStackUser"}
+			}
+		},
+
+		
+		
+		
+		
+		
+		"SwiftProxyWaitHandle" : {
+			"Type" : "AWS::CloudFormation::WaitConditionHandle"
+		},
+		"SwiftProxyWaitCondition" : {
+			"Type" : "AWS::CloudFormation::WaitCondition",
+			"DependsOn" : "SwiftProxyServer",
+			"Properties" : {
+			"Handle" : {"Ref" : "SwiftProxyWaitHandle"},
+			"Timeout" : "1200"
+			}
+		},	  
+
+		
+		"SwiftProxyIPAddress" : {
+			"Type" : "AWS::EC2::EIP"
+		},
+
+		"SwiftProxyIPAssoc" : {
+			"Type" : "AWS::EC2::EIPAssociation",
+			"Properties" : {
+				"InstanceId" : { "Ref" : "SwiftProxyServer" },
+				"EIP" : { "Ref" : "SwiftProxyIPAddress" }
+			}
+		},
+		
+		"SwiftProxySecurityGroup" : {
+			"Type" : "AWS::EC2::SecurityGroup",
+			"Properties" : {
+				"GroupDescription" : "Enable SSH access via port 22",
+				"SecurityGroupIngress" : [
+					{"IpProtocol" : "tcp", "FromPort" : "80", "ToPort" : "80", "CidrIp" : "0.0.0.0/0"},
+					{"IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "CidrIp" : "0.0.0.0/0"}
+				]
+			}
+		},
+		
+		
+    "SwiftProxyServer": {
+      "Type": "AWS::EC2::Instance",
+      "Metadata" : {
+        "AWS::CloudFormation::Init" : {
+			"configSets" : {
+				"fullinstall" : [ "setup_swiftproxy" ]
+			},
+			"setup_swiftproxy" : {
+				"packages" : {
+					"apt" : {
+		                "swift"                 : [],
+		                "openssh-server"           : [],
+		                "python-xattr"           : [],
+		                "python-memcache"           : [],
+			            "swift-proxy"           : [],
+			            "memcached"           : []
+					}
+				},
+				"files" : {
+					   "/opt/osonaws/setup_swiftproxy" : {
+							"content" : { "Fn::Join" : ["", [
+								"#!/bin/bash -v\n",
+								"cd /etc/swift\n",
+								"openssl req -new -x509 -nodes -out cert.crt -keyout cert.key\n",								
+								"cat << EOF > /etc/swift/proxy-server.conf\n",
+								"[DEFAULT]\n",
+								"bind_port = 8888\n",
+								"user = swift\n",
+								"[pipeline:main]\n",
+								"pipeline = healthcheck cache swift3 authtoken keystone proxy-server\n",
+								"[app:proxy-server]\n",
+								"use = egg:swift#proxy\n",
+								"allow_account_management = true\n",
+								"account_autocreate = true\n",
+								"[filter:keystone]\n",
+								"paste.filter_factory = keystone.middleware.swift_auth:filter_factory\n",
+								"operator_roles = Member,admin, swiftoperator\n",
+								"[filter:authtoken]\n",
+								"paste.filter_factory = keystone.middleware.auth_token:filter_factory\n",
+								"# Delaying the auth decision is required to support token-less\n",
+								"# usage for anonymous referrers ('.r:*').\n",
+								"delay_auth_decision = 10\n",
+								"service_port = 5000\n",
+								"service_host = 127.0.0.1\n",
+								"auth_port = 35357\n",
+								"auth_host = 127.0.0.1\n",
+								"auth_protocol = \n",
+								"auth_uri = http://127.0.0.1:5000/\n",
+								"auth_token = 012345SECRET99TOKEN012345\n",
+								"admin_token = 012345SECRET99TOKEN012345\n",
+								"admin_tenant_name = service\n",
+								"admin_user = swift\n",
+								"admin_password = swift\n",
+								"[filter:cache]\n",
+								"use = egg:swift#memcache\n",
+								"set log_name = cache\n",
+								"[filter:catch_errors]\n",
+								"use = egg:swift#catch_errors\n",
+								"[filter:healthcheck]\n",
+								"use = egg:swift#healthcheck\n",
+								"EOF\n",
+								
+								
+								"cd /etc/swift\n",
+								"swift-ring-builder account.builder create 18 3 1\n",
+								"swift-ring-builder container.builder create 18 3 1\n",
+								"swift-ring-builder object.builder create 18 3 1\n",
+								
+								"# Node 1\n",
+								"swift-ring-builder account.builder add z1-192.168.122.11:6002/vdb 100\n",
+								"swift-ring-builder container.builder add z1-192.168.122.11:6001/vdb 100\n",
+								"swift-ring-builder object.builder add z1-192.168.122.11:6000/vdb 100\n",
+								
+								"# Node 2\n",
+								"swift-ring-builder account.builder add z2-192.168.122.12:6002/vdb 100\n",
+								"swift-ring-builder container.builder add z2-192.168.122.12:6001/vdb 100\n",
+								"swift-ring-builder object.builder add z2-192.168.122.12:6000/vdb 100\n",
+								
+								"# Node 3\n",
+								"swift-ring-builder account.builder add z3-192.168.122.13:6002/vdb 100\n",
+								"swift-ring-builder container.builder add z3-192.168.122.13:6001/vdb 100\n",
+								"swift-ring-builder object.builder add z3-192.168.122.13:6000/vdb 100\n",
+								
+								"swift-ring-builder account.builder rebalance\n",
+								"swift-ring-builder container.builder rebalance\n",
+								"swift-ring-builder object.builder rebalance\n",
+								]]},
+							"mode"  : "000700",
+							"owner" : "ubuntu",
+							"group" : "ubuntu"
+					   }
+				},
+				"commands" : {
+					"01_setup_swiftproxy" : {
+						"command" : "/opt/osonaws/setup_swiftproxy"
+					}
+				}
+			}
+          }
+      },
+      "Properties" : {
+			"KeyName" : { "Ref" : "KeyName" },
+			"InstanceType": { "Ref": "InstanceType" },
+			"ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" },
+                    { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" }, "Arch" ] } ] },
+			"SecurityGroups" : [ {"Ref" : "SwiftProxySecurityGroup"} ],
+			"Monitoring" : "false",
+			"UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
+				"#! /bin/bash\n",
+
+				"# -- Update\n",
+				"apt-get update\n",
+				"apt-get -y install python-setuptools\n",
+				"easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",
+				
+				"function error_exit\n",
+				"{\n",
+				"  cfn-signal -e 1 -r \"$1\" '", { "Ref" : "SwiftProxyWaitHandle" }, "'\n",
+				"  exit 1\n",
+				"}\n",
+				"cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r SwiftProxyServer ",
+				"    --access-key ",  { "Ref" : "OpenstackUserAccessKey" },
+				"    --secret-key ", {"Fn::GetAtt": ["OpenstackUserAccessKey", "SecretAccessKey"]},
+				"    --region ", { "Ref" : "AWS::Region" }, 
+				"    --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
+				"# All is well so signal success\n",
+				"cfn-signal -e 0 -r \"SwiftProxy setup complete\" '", { "Ref" : "SwiftProxyWaitHandle" }, "'\n"
+				]]}}
+		}
+	}
+}
+}
+  
