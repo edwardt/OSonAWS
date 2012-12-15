@@ -1,0 +1,681 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+
+  "Description" : "OpenStack on Amazon web service template",
+
+  "Parameters" : {
+ 
+    "KeyName" : {
+      "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the instances",
+      "Default" : "cloudy",
+      "Type" : "String",
+      "MinLength": "1",
+      "MaxLength": "64",
+      "AllowedPattern" : "[-_ a-zA-Z0-9]*",
+      "ConstraintDescription" : "can contain only alphanumeric characters, spaces, dashes and underscores."
+    },
+    
+    "InstanceType" : {
+      "Description" : "Instance type",
+      "Type" : "String",
+      "Default" : "m1.small",
+      "AllowedValues" : [ "t1.micro","m1.small","m1.medium","m1.large","m1.xlarge","m2.xlarge","m2.2xlarge","m2.4xlarge","c1.medium","c1.xlarge","cc1.4xlarge","cc2.8xlarge","cg1.4xlarge"],
+      "ConstraintDescription" : "must be a valid EC2 instance type."
+    },
+    
+    "KeystoneMysqlRootPassword": {
+      "Default": "WSORa6xTu2",
+      "Description" : "Keystone's MySQL root password",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "64",
+      "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
+      "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
+    },
+    
+    "KeystoneMysqlUserPassword": {
+      "Default": "IWur6lc2CQ",
+      "Description" : "Keystone's MySQL user password",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "64",
+      "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
+      "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
+    },
+      
+    "KeystoneSwiftUserPassword": {
+      "Default": "icXyuCaywR",
+      "Description" : "Keystone swift user password",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "64",
+      "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
+      "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
+    },
+      
+    "KeystoneAdminToken": {
+      "Default": "E5VfT9rgAc",
+      "Description" : "Keystone admin token",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "64",
+      "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
+      "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
+    },  
+    
+    "SwiftHashPathPrefix": {
+      "Default": "3e3f6364f0d7f06cf8dc50430c3cb4ef",
+      "Description" : "Swift Hash Prefix",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "64",
+      "AllowedPattern" : "[a-zA-Z0-9]*",
+      "ConstraintDescription" : "must begin with a letter and contain only alpha characters."
+    },
+    
+	"SwiftNodeDiskSize": {
+	  "Default": "1",
+	  "Description" : "Dedicated disk for swift",
+	  "Type": "String"
+	},
+
+	"SwiftNodeNumber": {
+	  "Default": "3",
+      "Description" : "Number of Swift nodes",
+      "Type": "String"
+	}
+  },
+
+  "Mappings" : {
+
+    "AWSRegionArch2AMI" : {
+      "us-east-1"      : { "64" : "ami-82fa58eb" },
+	  "us-west-1"      : { "64" : "ami-5965401c" },
+	  "us-west-2"      : { "64" : "ami-4438b474" },
+	  "eu-west-1"      : { "64" : "ami-ab9491df" },
+	  "sa-east-1"      : { "64" : "ami-5c03dd41" },
+	  "ap-southeast-1" : { "64" : "ami-acf6b0fe" },
+	  "ap-northeast-1" : { "64" : "ami-c641f2c7" }
+    }
+  },
+	
+  "Resources" : {
+
+	"OpenStackUser" : {
+	  "Type" : "AWS::IAM::User",
+	    "Properties" : {
+		  "Path": "/",
+		    "Policies": [{
+			  "PolicyName": "DefaultStack",
+			    "PolicyDocument": {
+				  "Statement": [
+				  {
+				    "Sid": "CloudformationPolicy",
+					"Effect":"Allow",
+					"Action":"cloudformation:DescribeStackResource",
+				    "Resource":"*"
+				  },
+				  {
+				    "Sid": "CloudWatchPolicy",
+					"Effect"   : "Allow",
+					"Action"   : "cloudwatch:PutMetricData",
+				    "Resource" : "*"
+				  }]
+				}
+			}]
+		}
+	},
+	
+	"OpenstackUserAccessKey" : {
+	  "Type" : "AWS::IAM::AccessKey",
+	  "Properties" : {
+	    "UserName" : {"Ref": "OpenStackUser"}
+	  }
+	},	
+
+	"SwiftClusterSecurityGroup" : {
+	  "Type" : "AWS::EC2::SecurityGroup",
+	  "Properties" : {
+	    "GroupDescription" : "Enable SSH access via port 22",
+		"SecurityGroupIngress" : [
+		  {"IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "CidrIp" : "0.0.0.0/0"}
+		]
+	  }
+	},
+	
+	"KeystoneWaitHandle" : {
+	  "Type" : "AWS::CloudFormation::WaitConditionHandle"
+	},
+	
+	"KeystoneWaitCondition" : {
+	  "Type" : "AWS::CloudFormation::WaitCondition",
+	  "DependsOn" : "KeystoneServer",
+	  "Properties" : {
+	    "Handle" : {"Ref" : "KeystoneWaitHandle"},
+	    "Timeout" : "1200"
+	  }
+	},	  
+	
+	"KeystoneIPAddress" : {
+	  "Type" : "AWS::EC2::EIP"
+	},
+
+	"KeystoneIPAssoc" : {
+	  "Type" : "AWS::EC2::EIPAssociation",
+	  "Properties" : {
+	    "InstanceId" : { "Ref" : "KeystoneServer" },
+		"EIP" : { "Ref" : "KeystoneIPAddress" }
+	  }
+	},
+	
+	"KeystoneServer": {
+	  "Type": "AWS::EC2::Instance",
+	    "Metadata" : {
+	      "AWS::CloudFormation::Init" : {
+		    "configSets" : {
+			  "fullinstall" : [ "setup_seed", "setup_database", "setup_keystone" ]
+			 },
+			"setup_seed" : {
+			  "files" : {
+			    "/opt/osonaws/tmp/all.preseed" : {
+				  "content" : { "Fn::Join" : ["", [
+				    "mysql-server mysql-server/root_password password ", { "Ref" : "KeystoneMysqlRootPassword" }, "\n",
+				    "mysql-server mysql-server/root_password_again password ", { "Ref" : "KeystoneMysqlRootPassword" }, "\n",
+				    "mysql-server mysql-server/start_on_boot boolean true\n"
+				  ]]},
+				  "mode"  : "000600",
+				  "owner" : "ubuntu",
+				  "group" : "ubuntu"
+				},
+				"/opt/osonaws/tmp/setup_seed" : {
+				  "content" : { "Fn::Join" : ["", [
+				    "#!/bin/bash -v\n",
+					"debconf-set-selections < /opt/osonaws/tmp/all.preseed\n"
+				  ]]},
+				  "mode"  : "000700",
+				  "owner" : "ubuntu",
+				  "group" : "ubuntu"
+				}	
+			  },
+			  "commands" : {
+			    "01_seed" : {
+			      "command" : "/opt/osonaws/tmp/setup_seed"
+			    }
+			  }
+			},
+			"setup_database" : {
+			  "packages" : {
+			    "apt" : {
+				  "mysql-server"			: []
+				}
+			  },
+			  "files" : {
+			    "/opt/osonaws/setup.mysql" : {
+				  "content" : { "Fn::Join" : ["", [
+				    "CREATE DATABASE keystone;\n",
+					"GRANT ALL ON keystone.* TO 'keystone'@'%' IDENTIFIED BY '", { "Ref" : "KeystoneMysqlUserPassword" }, "';\n",
+					"GRANT ALL ON keystone.* TO 'keystone'@'localhost' IDENTIFIED BY '", { "Ref" : "KeystoneMysqlUserPassword" }, "';\n"
+				  ]]},
+				  "mode"  : "000600",
+				  "owner" : "ubuntu",
+			      "group" : "ubuntu"
+				},
+				"/opt/osonaws/setup_database" : {
+				  "content" : { "Fn::Join" : ["", [
+				    "#!/bin/bash -v\n",
+					"mysql -u root --password='", { "Ref" : "KeystoneMysqlRootPassword" }, "' < /opt/osonaws/setup.mysql\n"
+				  ]]},
+				  "mode"  : "000700",
+				  "owner" : "ubuntu",
+				  "group" : "ubuntu"
+				}
+			  },
+			  "commands" : {
+			    "01_setup_database" : {
+				  "command" : "/opt/osonaws/setup_database"
+				}
+			  }
+			},
+			"setup_keystone" : {
+			  "packages" : {
+				"apt" : {
+			      "keystone"                 : [],
+			      "python-mysqldb"           : []
+				}
+			  },
+			  "files" : {
+			    "/opt/osonaws/setup_keystone" : {
+				  "content" : { "Fn::Join" : ["", [
+					"#!/bin/bash -v\n",
+					"rm /var/lib/keystone/keystone.db\n",
+					"sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mysql/my.cnf\n",
+					"sed -i \"s/sqlite:\\/\\/\\/\\/var\\/lib\\/keystone\\/keystone.db\/mysql:\\/\\/keystone:", { "Ref" : "KeystoneMysqlUserPassword" }, "@0.0.0.0\\/keystone\/g\" /etc/keystone/keystone.conf\n",
+					"sed -i \"s/admin_token = ADMIN/admin_token = ", { "Ref" : "KeystoneAdminToken" }, "/g\" /etc/keystone/keystone.conf\n",
+					"service mysql restart\n",
+					"service keystone restart\n",
+					"keystone-manage db_sync\n"
+				  ]]},
+				"mode"  : "000700",
+				"owner" : "ubuntu",
+				"group" : "ubuntu"
+				},
+				"/opt/osonaws/setup_keystone_data" : {
+				  "content" : { "Fn::Join" : ["", [
+				    "#!/bin/bash -v\n",		
+					"function get_id () {\n",
+					" echo `\"$@\" | awk '/ id / { print $4 }'`\n",
+					"}\n",
+					"ADMIN_PASSWORD=${ADMIN_PASSWORD:-", { "Ref" : "KeystoneSwiftUserPassword" }, "}\n",
+					"SERVICE_PASSWORD=${SERVICE_PASSWORD:-$ADMIN_PASSWORD}\n",
+					"SERVICE_TENANT_NAME=${SERVICE_TENANT_NAME:-service}\n",
+					"SERVICE_HOST='127.0.0.1'\n",
+					"export SERVICE_TOKEN='", { "Ref" : "KeystoneAdminToken" }, "'\n",
+					"export SERVICE_ENDPOINT='http://0.0.0.0:35357/v2.0'\n",
+					"SERVICE_TENANT=$(get_id keystone tenant-create --name=\"$SERVICE_TENANT_NAME\")\n",
+					"ADMIN_ROLE=$(get_id keystone role-create --name=admin)\n",
+					"SWIFT_USER=$(get_id keystone user-create --name=swift --pass=\"$SERVICE_PASSWORD\" --tenant_id $SERVICE_TENANT --email=swift@example.com)\n",
+					"keystone user-role-add --tenant_id $SERVICE_TENANT --user $SWIFT_USER --role $ADMIN_ROLE\n",
+					"SWIFT_SERVICE=$(get_id keystone service-create --name=swift --type=\"object-store\" --description=\"Swift Service\")\n",
+					"keystone endpoint-create --region RegionOne --service_id $SWIFT_SERVICE --publicurl \"http:\/\/$SERVICE_HOST:8080\/v1\/AUTH_%(tenant_id)s\" --adminurl \"http:\/\/$SERVICE_HOST:8080\" --internalurl \"http:\/\/$SERVICE_HOST:8080\/v1\/AUTH_%(tenant_id)s\"\n"
+				  ]]},
+				  "mode"  : "000700",
+				  "owner" : "ubuntu",
+				  "group" : "ubuntu"
+				}
+			  },
+			  "commands" : {
+			    "01_setup_keystone" : {
+				  "command" : "/opt/osonaws/setup_keystone"
+				},
+				"02_setup_keystone_data" : {
+				  "command" : "/opt/osonaws/setup_keystone_data"
+			    }
+			  }
+			}
+	      }
+	    },
+	    "Properties" : {
+		  "KeyName" : { "Ref" : "KeyName" },
+		  "InstanceType": { "Ref": "InstanceType" },
+		  "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, "64" ] },
+		  "Monitoring" : "false",
+		  "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
+		    "#! /bin/bash\n",
+			"# -- Update\n",
+			"apt-get update\n",
+			"apt-get -y install python-setuptools\n",
+			"easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",	
+			"function error_exit\n",
+			"{\n",
+			"  cfn-signal -e 1 -r \"$1\" '", { "Ref" : "KeystoneWaitHandle" }, "'\n",
+			"  exit 1\n",
+			"}\n",
+			"cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r KeystoneServer ",
+			"    --access-key ",  { "Ref" : "OpenstackUserAccessKey" },
+			"    --secret-key ", {"Fn::GetAtt": ["OpenstackUserAccessKey", "SecretAccessKey"]},
+			"    --region ", { "Ref" : "AWS::Region" }, 
+			"    --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
+			"# All is well so signal success\n",
+			"cfn-signal -e 0 -r \"Keystone setup complete\" '", { "Ref" : "KeystoneWaitHandle" }, "'\n"
+		  ]]}
+	    }
+      }
+	},
+	
+	
+	"SwiftNodeWaitHandle" : {
+	  "Type" : "AWS::CloudFormation::WaitConditionHandle"
+	},
+	
+	"SwiftNodeWaitCondition" : {
+	  "Type" : "AWS::CloudFormation::WaitCondition",
+	  "DependsOn" : "SwiftNodesGroup",
+	  "Properties" : {
+	    "Handle" : {"Ref" : "SwiftNodeWaitHandle"},
+	    "Timeout" : "1200"
+	  }
+	},		
+    
+	"SwiftNodesGroup" : {
+      "Type" : "AWS::AutoScaling::AutoScalingGroup",
+      "Properties" : {
+        "AvailabilityZones" : { "Fn::GetAZs" : "" },
+        "LaunchConfigurationName" : { "Ref" : "SwiftNodeServer" },
+        "MinSize" : "3",
+        "MaxSize" : "10",
+        "DesiredCapacity" : { "Ref" : "SwiftNodeNumber" }
+      }
+    },
+	
+    "SwiftNodeServer": {
+      "Type": "AWS::AutoScaling::LaunchConfiguration",
+        "Metadata" : {
+          "AWS::CloudFormation::Init" : {
+  		    "configSets" : {
+  			  "fullinstall" : [ "setup_swiftnode" ]
+  			},
+  			"setup_swiftnode" : {
+  			  "packages" : {
+  			    "apt" : {
+  		          "swift"            : [],
+  		          "openssh-server"   : [],
+  		          "python-xattr"     : [],
+  		          "python-memcache"  : [],
+  		          "swift-account"    : [],
+  		          "swift-container"	 : [],
+  		          "swift-object"     : [],
+  		          "xfsprogs"         : []
+  				}
+  			  },
+  			  "files" : {
+  			    "/opt/osonaws/setup_swiftnode" : {
+  				  "content" : { "Fn::Join" : ["", [
+  					"#!/bin/bash -v\n",
+  					"mkdir -p /etc/swift\n",
+  					"chown -R swift:swift /etc/swift/\n",
+  					"cat << EOF > /etc/swift/swift.conf\n",
+  					"[swift-hash]\n",
+  					"swift_hash_path_suffix = ", { "Ref" : "SwiftHashPathPrefix" }, " \n",
+  					"EOF\n",
+					"mkfs.xfs -i size=1024 /dev/xvdb\n",
+  					"echo '/dev/xvdb /srv/node/xvdb xfs noatime,nodiratime,nobarrier,logbufs=8 0 0' >> /etc/fstab\n",
+  					"mkdir -p /srv/node/xvdb\n",
+  					"mount /srv/node/xvdb\n",
+  					"chown -R swift:swift /srv/node\n",
+  					"cat << EOF > /etc/rsyncd.conf\n",
+  					"uid = swift\n",
+  					"gid = swift\n",
+  					"log file = /var/log/rsyncd.log\n",
+  					"pid file = /var/run/rsyncd.pid\n",
+  					"address = 0.0.0.0\n",
+  					"[account]\n",
+  					"max connections = 2\n",
+  					"path = /srv/node/\n",
+  					"read only = false\n",
+  					"lock file = /var/lock/account.lock\n",
+  					"[container]\n",
+  					"max connections = 2\n",
+  					"path = /srv/node/\n",
+  					"read only = false\n",
+  					"lock file = /var/lock/container.lock\n",
+  					"[object]\n",
+  					"max connections = 2\n",
+  					"path = /srv/node/\n",
+  					"read only = false\n",
+					"lock file = /var/lock/object.lock\n",
+					"EOF\n",
+					"sed -i 's/RSYNC_ENABLE=false/RSYNC_ENABLE=true/g' /etc/default/rsync\n",
+					"service rsync start\n",
+					"cat << EOF > /etc/swift/account-server.conf\n",
+					"[DEFAULT]\n",
+					"bind_ip = 0.0.0.0\n",
+					"workers = 2\n",
+					"\n",
+					"[pipeline:main]\n",
+					"pipeline = account-server\n",
+					"\n",
+					"[app:account-server]\n",
+					"use = egg:swift#account\n",
+					"\n",
+					"[account-replicator]\n",
+					"\n",
+					"[account-auditor]\n",
+					"\n",
+					"[account-reaper]\n",
+					"\n",
+					"EOF\n",
+					"cat << EOF > /etc/swift/container-server.conf\n",
+					"[DEFAULT]\n",
+					"bind_ip = 0.0.0.0\n",
+					"workers = 2\n",
+					"\n",
+					"[pipeline:main]\n",
+					"pipeline = container-server\n",
+					"\n",
+					"[app:container-server]\n",
+					"use = egg:swift#container\n",
+					"\n",
+					"[container-replicator]\n",
+					"\n",
+					"[container-updater]\n",
+					"\n",
+					"[container-auditor]\n",
+					"\n",
+					"EOF\n",
+					"cat << EOF > /etc/swift/object-server.conf\n",
+					"[DEFAULT]\n",
+					"bind_ip = 0.0.0.0\n",
+					"workers = 2\n",
+					"\n",
+					"[pipeline:main]\n",
+					"pipeline = object-server\n",
+					"\n",
+					"[app:object-server]\n",
+					"use = egg:swift#object\n",
+					"\n",
+					"[object-replicator]\n",
+					"\n",
+					"[object-updater]\n",
+					"\n",
+					"[object-auditor]\n",
+					"\n",
+					"[object-expirer]\n",
+					"EOF\n",
+					"swift-init object-server start\n",
+					"swift-init object-replicator start\n",
+					"swift-init object-updater start\n", 
+					"swift-init object-auditor start\n",
+					"swift-init container-server start\n",
+					"swift-init container-replicator start\n",
+					"swift-init container-updater start\n",
+					"swift-init container-auditor start\n",
+					"swift-init account-server start\n",
+					"swift-init account-replicator start\n",
+					"swift-init account-auditor start\n"
+				  ]]},
+				"mode"  : "000700",
+				"owner" : "ubuntu",
+				"group" : "ubuntu"
+  			  }
+			},
+			"commands" : {
+			  "01_seed" : {
+			    "command" : "/opt/osonaws/setup_swiftnode"
+			  }
+			}
+		  }
+		}
+	  },
+      "Properties" : {
+	    "KeyName" : { "Ref" : "KeyName" },
+		"InstanceType": { "Ref": "InstanceType" },
+		"ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, "64" ] },
+		"BlockDeviceMappings" : [
+		  {"DeviceName" : "/dev/sdb", "Ebs": { "VolumeSize": { "Ref" : "SwiftNodeDiskSize" }}}],
+		"UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
+		  "#! /bin/bash\n",
+		  "# -- Update\n",
+		  "apt-get update\n",
+		  "apt-get -y install python-setuptools\n",
+		  "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",	
+          "function error_exit\n",
+		  "{\n",
+		  "  cfn-signal -e 1 -r \"$1\" '", { "Ref" : "SwiftNodeWaitHandle" }, "'\n",
+		  "  exit 1\n",
+		  "}\n",
+		  "cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r SwiftNodeServer ",
+		  "    --access-key ",  { "Ref" : "OpenstackUserAccessKey" },
+		  "    --secret-key ", {"Fn::GetAtt": ["OpenstackUserAccessKey", "SecretAccessKey"]},
+		  "    --region ", { "Ref" : "AWS::Region" }, 
+		  "    --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
+		  "# All is well so signal success\n",
+		  "cfn-signal -e 0 -r \"SwiftNode setup complete\" '", { "Ref" : "SwiftNodeWaitHandle" }, "'\n"
+		  ]]}
+		}
+	  }	
+    },
+
+	"SwiftProxyWaitHandle" : {
+	  "Type" : "AWS::CloudFormation::WaitConditionHandle"
+	},
+	
+	"SwiftProxyWaitCondition" : {
+	  "Type" : "AWS::CloudFormation::WaitCondition",
+	  "DependsOn" : "SwiftProxyServer",
+	  "Properties" : {
+	    "Handle" : {"Ref" : "SwiftProxyWaitHandle"},
+	    "Timeout" : "1200"
+	  }
+	},	  
+
+	"SwiftProxyIPAddress" : {
+	  "Type" : "AWS::EC2::EIP"
+	},
+
+	"SwiftProxyIPAssoc" : {
+	  "Type" : "AWS::EC2::EIPAssociation",
+	  "Properties" : {
+		  "InstanceId" : { "Ref" : "SwiftProxyServer" },
+		  "EIP" : { "Ref" : "SwiftProxyIPAddress" }
+	  }
+	},
+    
+	"SwiftProxyServer": {
+	  "Type": "AWS::EC2::Instance",
+	    "Metadata" : {
+	      "AWS::CloudFormation::Init" : {
+		    "configSets" : {
+			  "fullinstall" : [ "setup_swiftproxy" ]
+			},
+			"setup_swiftproxy" : {
+			  "packages" : {
+			    "apt" : {
+			      "swift"                 : [],
+			      "openssh-server"           : [],
+			      "python-xattr"           : [],
+			      "python-memcache"           : [],
+				  "swift-proxy"           : [],
+				  "memcached"           : []
+				}
+			  },
+			  "files" : {
+			    "/opt/osonaws/setup_swiftproxy" : {
+				  "content" : { "Fn::Join" : ["", [
+				    "#!/bin/bash -v\n",
+								
+					"mkdir -p /etc/swift\n",
+					"chown -R swift:swift /etc/swift/\n",
+					"cat << EOF > /etc/swift/swift.conf\n",
+					"[swift-hash]\n",
+					"swift_hash_path_suffix = ", { "Ref" : "SwiftHashPathPrefix" }, " \n",
+					"EOF\n",
+								
+					"cd /etc/swift\n",
+					"#openssl req -new -x509 -nodes -out cert.crt -keyout cert.key\n",								
+					"cat << EOF > /etc/swift/proxy-server.conf\n",
+					"[DEFAULT]\n",
+					"bind_port = 8888\n",
+					"user = swift\n",
+					"[pipeline:main]\n",
+					"pipeline = healthcheck cache swift3 authtoken keystone proxy-server\n",
+					"[app:proxy-server]\n",
+					"use = egg:swift#proxy\n",
+					"allow_account_management = true\n",
+					"account_autocreate = true\n",
+					"[filter:keystone]\n",
+					"paste.filter_factory = keystone.middleware.swift_auth:filter_factory\n",
+					"operator_roles = Member,admin, swiftoperator\n",
+					"[filter:authtoken]\n",
+					"paste.filter_factory = keystone.middleware.auth_token:filter_factory\n",
+					"# Delaying the auth decision is required to support token-less\n",
+					"# usage for anonymous referrers ('.r:*').\n",
+					"delay_auth_decision = 10\n",
+					"service_port = 5000\n",
+					"service_host = 127.0.0.1\n",
+					"auth_port = 35357\n",
+					"auth_host = 127.0.0.1\n",
+					"auth_protocol = \n",
+					"auth_uri = http://127.0.0.1:5000/\n",
+					"auth_token = 012345SECRET99TOKEN012345\n",
+					"admin_token = 012345SECRET99TOKEN012345\n",
+					"admin_tenant_name = service\n",
+					"admin_user = swift\n",
+					"admin_password = swift\n",
+					"[filter:cache]\n",
+					"use = egg:swift#memcache\n",
+					"set log_name = cache\n",
+					"[filter:catch_errors]\n",
+					"use = egg:swift#catch_errors\n",
+					"[filter:healthcheck]\n",
+					"use = egg:swift#healthcheck\n",
+					"EOF\n",
+					
+					"cd /etc/swift\n",
+					"swift-ring-builder account.builder create 18 3 1\n",
+					"swift-ring-builder container.builder create 18 3 1\n",
+					"swift-ring-builder object.builder create 18 3 1\n",
+					
+					"# Node 1\n",
+					"swift-ring-builder account.builder add z1-192.168.122.11:6002/vdb 100\n",
+					"swift-ring-builder container.builder add z1-192.168.122.11:6001/vdb 100\n",
+					"swift-ring-builder object.builder add z1-192.168.122.11:6000/vdb 100\n",
+					
+					"# Node 2\n",
+					"swift-ring-builder account.builder add z2-192.168.122.12:6002/vdb 100\n",
+					"swift-ring-builder container.builder add z2-192.168.122.12:6001/vdb 100\n",
+					"swift-ring-builder object.builder add z2-192.168.122.12:6000/vdb 100\n",
+					
+					"# Node 3\n",
+					"swift-ring-builder account.builder add z3-192.168.122.13:6002/vdb 100\n",
+					"swift-ring-builder container.builder add z3-192.168.122.13:6001/vdb 100\n",
+					"swift-ring-builder object.builder add z3-192.168.122.13:6000/vdb 100\n",
+					
+					"swift-ring-builder account.builder rebalance\n",
+					"swift-ring-builder container.builder rebalance\n",
+					"swift-ring-builder object.builder rebalance\n"
+					]]},
+				  "mode"  : "000700",
+				  "owner" : "ubuntu",
+				  "group" : "ubuntu"
+				}
+			  },
+		    "commands" : {
+			  "01_setup_swiftproxy" : {
+				"command" : "/opt/osonaws/setup_swiftproxy"
+			  }
+			}
+		  }
+	    }
+	  },
+	  "Properties" : {
+	  "KeyName" : { "Ref" : "KeyName" },
+	  "InstanceType": { "Ref": "InstanceType" },
+	  "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, "64" ] },
+	  "SecurityGroups" : [ {"Ref" : "SwiftClusterSecurityGroup"} ],
+	  "Monitoring" : "false",
+	  "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
+	    "#! /bin/bash\n",
+
+		"# -- Update\n",
+		"apt-get update\n",
+		"apt-get -y install python-setuptools\n",
+		"easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",
+					
+		"function error_exit\n",
+		"{\n",
+		"  cfn-signal -e 1 -r \"$1\" '", { "Ref" : "SwiftProxyWaitHandle" }, "'\n",
+		"  exit 1\n",
+		"}\n",
+		"cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r SwiftProxyServer ",
+		"    --access-key ",  { "Ref" : "OpenstackUserAccessKey" },
+		"    --secret-key ", {"Fn::GetAtt": ["OpenstackUserAccessKey", "SecretAccessKey"]},
+		"    --region ", { "Ref" : "AWS::Region" }, 
+		"    --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
+		"# All is well so signal success\n",
+		"cfn-signal -e 0 -r \"SwiftProxy setup complete\" '", { "Ref" : "SwiftProxyWaitHandle" }, "'\n"
+		]]}}
+	  }
+    }    
+  }
+}
+	
