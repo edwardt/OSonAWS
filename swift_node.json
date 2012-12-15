@@ -1,0 +1,349 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+
+  "Description" : "OpenStack on Amazon web service template",
+
+  "Parameters" : {
+
+    "KeyName" : {
+      "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the instances",
+      "Default" : "cloudy",
+      "Type" : "String",
+      "MinLength": "1",
+      "MaxLength": "64",
+      "AllowedPattern" : "[-_ a-zA-Z0-9]*",
+      "ConstraintDescription" : "can contain only alphanumeric characters, spaces, dashes and underscores."
+    },
+
+    "InstanceType" : {
+      "Description" : "Instance type",
+      "Type" : "String",
+      "Default" : "m1.small",
+      "AllowedValues" : [ "t1.micro","m1.small","m1.medium","m1.large","m1.xlarge","m2.xlarge","m2.2xlarge","m2.4xlarge","c1.medium","c1.xlarge","cc1.4xlarge","cc2.8xlarge","cg1.4xlarge"],
+      "ConstraintDescription" : "must be a valid EC2 instance type."
+    },
+    
+    "SwiftHashPathPrefix": {
+        "Default": "3e3f6364f0d7f06cf8dc50430c3cb4ef",
+        "Description" : "Swift Hash Prefix",
+        "Type": "String",
+        "MinLength": "1",
+        "MaxLength": "64",
+        "AllowedPattern" : "[a-zA-Z][a-zA-Z]*",
+        "ConstraintDescription" : "must begin with a letter and contain only alpha characters."
+      },
+      
+		"SwiftNodeDiskSize": {
+			"Default": "1",
+		  "Description" : "Dedicated disk for swift",
+		  "Type": "String"
+		}
+      
+      
+    
+  },
+  
+"Mappings" : {
+		
+		"AWSInstanceType2Arch" : {
+			"t1.micro"    : { "Arch" : "64" },
+			"m1.small"    : { "Arch" : "64" },
+			"m1.large"    : { "Arch" : "64" },
+			"m1.xlarge"   : { "Arch" : "64" },
+			"m2.xlarge"   : { "Arch" : "64" },
+			"m2.2xlarge"  : { "Arch" : "64" },
+			"m2.4xlarge"  : { "Arch" : "64" },
+			"c1.medium"   : { "Arch" : "32" },
+			"c1.xlarge"   : { "Arch" : "64" },
+			"cc1.4xlarge" : { "Arch" : "64" }
+		},
+		"AWSRegionArch2AMI" : {
+			"us-east-1"      : { "32" : "ami-a0ba68c9", "64" : "ami-baba68d3" },
+			"us-west-1"      : { "32" : "ami-63a8f126", "64" : "ami-6da8f128" },
+			"us-west-2"      : { "32" : "ami-ac05889c", "64" : "ami-ae05889e" },
+			"eu-west-1"      : { "32" : "ami-a99491dd", "64" : "ami-ab9491df" },
+			"sa-east-1"      : { "32" : "ami-b473aca9", "64" : "ami-b673acab" },
+			"ap-southeast-1" : { "32" : "ami-5c96d20e", "64" : "ami-e88acaba" },
+			"ap-northeast-1" : { "32" : "ami-0e299f0f", "64" : "ami-22ad1223" }
+		},
+	    "RegionMap" : {
+	        "us-east-1"      : { "AMI" : "ami-7f418316", "TestAz" : "us-east-1a" },
+	        "us-west-1"      : { "AMI" : "ami-951945d0", "TestAz" : "us-west-1a" },
+	        "us-west-2"      : { "AMI" : "ami-16fd7026", "TestAz" : "us-west-2a" },
+	        "eu-west-1"      : { "AMI" : "ami-24506250", "TestAz" : "eu-west-1a" },
+	        "sa-east-1"      : { "AMI" : "ami-3e3be423", "TestAz" : "sa-east-1a" },
+	        "ap-southeast-1" : { "AMI" : "ami-74dda626", "TestAz" : "ap-southeast-1a" },
+	        "ap-northeast-1" : { "AMI" : "ami-dcfa4edd", "TestAz" : "ap-northeast-1a" }
+	      }
+	},
+	
+  "Resources" : {
+
+	  "OpenStackUser" : {
+			"Type" : "AWS::IAM::User",
+			"Properties" : {
+				"Path": "/",
+				"Policies": [{
+					"PolicyName": "DefaultStack",
+					"PolicyDocument": {
+						"Statement": [
+							{
+								"Sid": "CloudformationPolicy",
+								"Effect":"Allow",
+								"Action":"cloudformation:DescribeStackResource",
+								"Resource":"*"
+							},
+							{
+								"Sid": "CloudWatchPolicy",
+								"Effect"   : "Allow",
+								"Action"   : "cloudwatch:PutMetricData",
+								"Resource" : "*"
+							}
+						]
+					}
+				}]
+			}
+		},
+		
+		"OpenstackUserAccessKey" : {
+			"Type" : "AWS::IAM::AccessKey",
+			"Properties" : {
+				"UserName" : {"Ref": "OpenStackUser"}
+			}
+		},
+
+		
+		
+		
+		
+		
+		"SwiftNodeWaitHandle" : {
+			"Type" : "AWS::CloudFormation::WaitConditionHandle"
+		},
+		"SwiftNodeWaitCondition" : {
+			"Type" : "AWS::CloudFormation::WaitCondition",
+			"DependsOn" : "SwiftNodeServer",
+			"Properties" : {
+			"Handle" : {"Ref" : "SwiftNodeWaitHandle"},
+			"Timeout" : "1200"
+			}
+		},	  
+
+		
+		"SwiftNodeIPAddress" : {
+			"Type" : "AWS::EC2::EIP"
+		},
+
+		"SwiftNodeIPAssoc" : {
+			"Type" : "AWS::EC2::EIPAssociation",
+			"Properties" : {
+				"InstanceId" : { "Ref" : "SwiftNodeServer" },
+				"EIP" : { "Ref" : "SwiftNodeIPAddress" }
+			}
+		},
+		
+		"SwiftNodeSecurityGroup" : {
+			"Type" : "AWS::EC2::SecurityGroup",
+			"Properties" : {
+				"GroupDescription" : "Enable SSH access via port 22",
+				"SecurityGroupIngress" : [
+					{"IpProtocol" : "tcp", "FromPort" : "80", "ToPort" : "80", "CidrIp" : "0.0.0.0/0"},
+					{"IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "CidrIp" : "0.0.0.0/0"}
+				]
+			}
+		},
+		
+		
+
+	    "SwiftNodeDisk" : {
+	      "Type" : "AWS::EC2::Volume",
+	      "Properties" : {
+	        "Size" : {"Ref" : "SwiftNodeDiskSize"},
+	        "AvailabilityZone" : { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "TestAz" ]}
+	      }
+	  },
+		
+		
+		
+    "SwiftNodeServer": {
+      "Type": "AWS::EC2::Instance",
+      "Metadata" : {
+        "AWS::CloudFormation::Init" : {
+			"configSets" : {
+				"fullinstall" : [ "setup_swiftnode" ]
+			},
+			"setup_swiftnode" : {
+				"packages" : {
+					"apt" : {
+		                "swift"                 : [],
+		                "openssh-server"           : [],
+		                "python-xattr"           : [],
+		                "python-memcache"           : [],
+		                "swift-account"           : [],
+		                "swift-container"           : [],
+		                "swift-object"           : [],
+		                "xfsprogs"           : []
+					}
+				},
+				"files" : {
+					   "/opt/osonaws/setup_swiftnode" : {
+							"content" : { "Fn::Join" : ["", [
+								"#!/bin/bash -v\n",
+
+								"mkdir -p /etc/swift\n",
+								"chown -R swift:swift /etc/swift/\n",
+								"cat << EOF > /etc/swift/swift.conf\n",
+								"[swift-hash]\n",
+								"swift_hash_path_suffix = ", { "Ref" : "SwiftHashPathPrefix" }, " \n",
+								"EOF\n",
+
+								"mkfs.xfs -i size=1024 /dev/xvdb\n",
+								"echo '/dev/xvdb /srv/node/xvdb xfs noatime,nodiratime,nobarrier,logbufs=8 0 0' >> /etc/fstab\n",
+								"mkdir -p /srv/node/xvdb\n",
+								"mount /srv/node/xvdb\n",
+								"chown -R swift:swift /srv/node\n",
+								
+								"cat << EOF > /etc/rsyncd.conf\n",
+								"uid = swift\n",
+								"gid = swift\n",
+								"log file = /var/log/rsyncd.log\n",
+								"pid file = /var/run/rsyncd.pid\n",
+								"address = 0.0.0.0\n",
+								"[account]\n",
+								"max connections = 2\n",
+								"path = /srv/node/\n",
+								"read only = false\n",
+								"lock file = /var/lock/account.lock\n",
+								"[container]\n",
+								"max connections = 2\n",
+								"path = /srv/node/\n",
+								"read only = false\n",
+								"lock file = /var/lock/container.lock\n",
+								"[object]\n",
+								"max connections = 2\n",
+								"path = /srv/node/\n",
+								"read only = false\n",
+								"lock file = /var/lock/object.lock\n",
+								"EOF\n",
+
+								"sed -i 's/RSYNC_ENABLE=false/RSYNC_ENABLE=true/g' /etc/default/rsync\n",
+								"service rsync start\n",
+
+								"cat << EOF > /etc/swift/account-server.conf\n",
+								"[DEFAULT]\n",
+								"bind_ip = 0.0.0.0\n",
+								"workers = 2\n",
+
+								"[pipeline:main]\n",
+								"pipeline = account-server\n",
+
+								"[app:account-server]\n",
+								"use = egg:swift#account\n",
+
+								"[account-replicator]\n",
+
+								"[account-auditor]\n",
+
+								"[account-reaper]\n",
+
+								"EOF\n",
+
+								"cat << EOF > /etc/swift/container-server.conf\n",
+								"[DEFAULT]\n",
+								"bind_ip = 0.0.0.0\n",
+								"workers = 2\n",
+
+								"[pipeline:main]\n",
+								"pipeline = container-server\n",
+
+								"[app:container-server]\n",
+								"use = egg:swift#container\n",
+
+								"[container-replicator]\n",
+
+								"[container-updater]\n",
+
+								"[container-auditor]\n",
+
+								"EOF\n",
+
+								"cat << EOF > /etc/swift/object-server.conf\n",
+								"[DEFAULT]\n",
+								"bind_ip = 0.0.0.0\n",
+								"workers = 2\n",
+
+								"[pipeline:main]\n",
+								"pipeline = object-server\n",
+
+								"[app:object-server]\n",
+								"use = egg:swift#object\n",
+
+								"[object-replicator]\n",
+
+								"[object-updater]\n",
+
+								"[object-auditor]\n",
+
+								"[object-expirer]\n",
+								"EOF\n",
+
+								"swift-init object-server start\n",
+								"swift-init object-replicator start\n",
+								"swift-init object-updater start\n", 
+								"swift-init object-auditor start\n",
+								"swift-init container-server start\n",
+								"swift-init container-replicator start\n",
+								"swift-init container-updater start\n",
+								"swift-init container-auditor start\n",
+								"swift-init account-server start\n",
+								"swift-init account-replicator start\n",
+								"swift-init account-auditor start\n"
+								
+								]]},
+							"mode"  : "000700",
+							"owner" : "ubuntu",
+							"group" : "ubuntu"
+				}
+			},
+			"commands" : {
+				"01_seed" : {
+					"command" : "/opt/osonaws/setup_swiftnode"
+				}
+			}
+        }}
+      },
+      "Properties" : {
+			"KeyName" : { "Ref" : "KeyName" },
+			"InstanceType": { "Ref": "InstanceType" },
+			"ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" },
+                    { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" }, "Arch" ] } ] },
+			"SecurityGroups" : [ {"Ref" : "SwiftNodeSecurityGroup"} ],
+			"Monitoring" : "false",
+			"Volumes" : [ 
+			             { "VolumeId" : { "Ref" : "SwiftNodeDisk" },
+			               "Device" : "/dev/sdk"
+			             }
+			           ],
+			"UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
+				"#! /bin/bash\n",
+
+				"# -- Update\n",
+				"apt-get update\n",
+				"apt-get -y install python-setuptools\n",
+				"easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",
+				
+				"function error_exit\n",
+				"{\n",
+				"  cfn-signal -e 1 -r \"$1\" '", { "Ref" : "SwiftNodeWaitHandle" }, "'\n",
+				"  exit 1\n",
+				"}\n",
+				"cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r SwiftNodeServer ",
+				"    --access-key ",  { "Ref" : "OpenstackUserAccessKey" },
+				"    --secret-key ", {"Fn::GetAtt": ["OpenstackUserAccessKey", "SecretAccessKey"]},
+				"    --region ", { "Ref" : "AWS::Region" }, 
+				"    --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
+				"# All is well so signal success\n",
+				"cfn-signal -e 0 -r \"SwiftNode setup complete\" '", { "Ref" : "SwiftNodeWaitHandle" }, "'\n"
+					]]}}
+			}	
+}}}
