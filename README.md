@@ -1,19 +1,16 @@
-OSonAWS -- OpenStack on Amazon Web Services
-===========================================
+This project is experimental.
 
-1 template, 1 cloud.
+OSonAWS is a set of template to quickly deploy an OpenStack cloud on Amazon Web Services.
 
-This template creates an OpenStack cloud on AWS.
+If you want to deploy OpenStack on a single machine for development, you should see http://devstack.org.
 
-First step, create a swift cluster. Done 90%.
+# Goals
 
-Second step, create nova/cinder/quantum. Done 0%
+* To quickely build OpenStack environment with many servers, network and storage (like a swift cluster).
 
-==========
-How to use
-==========
+BE CAREFUL : by default 5 EC2 instances (Keystone, SwiftProxy, 3x SwiftNodes) are launch with 3x1 Go EBS storage.
 
-Just go to cloud formation and launch the template.
-It's account free, it's zone free.
+# Start a QA Cloud
 
-Careful, by default 5 EC2 instances (Keystone, SwiftProxy, 3x SwiftNodes) are launch with 3x1 Go EBS storage.
+Load one template in AWS Cloudformation. Connection are (will be) in the output.
+Templates are AMI/AWS account/zone free and doesn't use any private software/data.
