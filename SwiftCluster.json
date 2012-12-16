@@ -299,6 +299,7 @@
           "KeyName" : { "Ref" : "KeyName" },
           "InstanceType": { "Ref": "InstanceType" },
           "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, "64" ] },
+          "SecurityGroups" : [ {"Ref" : "SwiftClusterSecurityGroup"} ],
           "Monitoring" : "false",
           "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
             "#! /bin/bash\n",
@@ -492,6 +493,7 @@
         "KeyName" : { "Ref" : "KeyName" },
         "InstanceType": { "Ref": "InstanceType" },
         "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, "64" ] },
+        "SecurityGroups" : [ {"Ref" : "SwiftClusterSecurityGroup"} ],
         "BlockDeviceMappings" : [{"DeviceName" : "/dev/sdb", "Ebs": { "VolumeSize": { "Ref" : "SwiftNodeDiskSize" }}}],
         "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
           "#! /bin/bash\n",
@@ -609,31 +611,8 @@
                     "use = egg:swift#catch_errors\n",
                     "[filter:healthcheck]\n",
                     "use = egg:swift#healthcheck\n",
-                    "EOF\n",
+                    "EOF\n"
                     
-                    "cd /etc/swift\n",
-                    "swift-ring-builder account.builder create 18 3 1\n",
-                    "swift-ring-builder container.builder create 18 3 1\n",
-                    "swift-ring-builder object.builder create 18 3 1\n",
-                    
-                    "# Node 1\n",
-                    "swift-ring-builder account.builder add z1-192.168.122.11:6002/vdb 100\n",
-                    "swift-ring-builder container.builder add z1-192.168.122.11:6001/vdb 100\n",
-                    "swift-ring-builder object.builder add z1-192.168.122.11:6000/vdb 100\n",
-                    
-                    "# Node 2\n",
-                    "swift-ring-builder account.builder add z2-192.168.122.12:6002/vdb 100\n",
-                    "swift-ring-builder container.builder add z2-192.168.122.12:6001/vdb 100\n",
-                    "swift-ring-builder object.builder add z2-192.168.122.12:6000/vdb 100\n",
-                    
-                    "# Node 3\n",
-                    "swift-ring-builder account.builder add z3-192.168.122.13:6002/vdb 100\n",
-                    "swift-ring-builder container.builder add z3-192.168.122.13:6001/vdb 100\n",
-                    "swift-ring-builder object.builder add z3-192.168.122.13:6000/vdb 100\n",
-                    
-                    "swift-ring-builder account.builder rebalance\n",
-                    "swift-ring-builder container.builder rebalance\n",
-                    "swift-ring-builder object.builder rebalance\n"
                     ]]},
                   "mode"  : "000700",
                   "owner" : "ubuntu",
