@@ -1,25 +1,20 @@
-OSonAWS
-=======
+OSonAWS -- OpenStack on Amazon Web Services
+===========================================
 
-OS templates on AWS
+1 template, 1 cloud.
 
-All json files will be merged into one big template which creates swift cluster. It's zone and account free.
+This template creates an OpenStack cloud on AWS.
 
+First step, create a swift cluster with Swift. Done 90%.
+Second step, create nova/cinder/quantum. Done 0%
 
-TODO 
+==========
+How to use
+==========
 
- Use VPC instead of Public IPs
+Just go to cloud formation and launch the template.
 
-Keystone template
-Launch the template in AWS (need to correct AMIs in mapping to Ubuntu12.04.1 LTS)
-To verify keystone :
+It's account free
+It's zone free
 
-TEST (replace OS_PASSWORD by swift user password parameter
-export OS_USERNAME=swift
-export OS_PASSWORD=icXyuCaywR
-export OS_TENANT_NAME=service
-export OS_AUTH_URL=http://127.0.0.1:35357/v2.0
-keystone endpoint-get --service object-store
-
-Swift node template
-Carefull, launchconfig with 3 EC2 instances.
+Careful, by default 5 EC2 instances are launch with 3x1 Go storage.
