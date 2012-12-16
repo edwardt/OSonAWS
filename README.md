@@ -5,7 +5,7 @@ OSonAWS -- OpenStack on Amazon Web Services
 
 This template creates an OpenStack cloud on AWS.
 
-First step, create a swift cluster with Swift. Done 90%.
+First step, create a swift cluster. Done 90%.
 
 Second step, create nova/cinder/quantum. Done 0%
 
