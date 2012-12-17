@@ -121,13 +121,19 @@
               "Effect"   : "Allow",
               "Action"   : "cloudwatch:PutMetricData",
               "Resource" : "*"
+            },
+            {
+              "Sid": "DescribeInstances",
+              "Effect": "Allow",
+              "Action": "ec2:DescribeInstances",
+              "Resource": "*"
             }]
           }
         }]
       }
     },
 
-    "OpenstackUserAccessKey" : {
+    "OpenStackUserAccessKey" : {
       "Type" : "AWS::IAM::AccessKey",
       "Properties" : {
         "UserName" : {"Ref": "OpenStackUser"}
@@ -264,7 +270,7 @@
                   "content" : { "Fn::Join" : ["", [
                     "#!/bin/bash -v\n",        
                     "function get_id () {\n",
-                    " echo `\"$@\" | awk '/ id / { print $4 }'`\n",
+                    " echo `\"$@\" | `\n",
                     "}\n",
                     "ADMIN_PASSWORD=${ADMIN_PASSWORD:-", { "Ref" : "KeystoneSwiftUserPassword" }, "}\n",
                     "SERVICE_PASSWORD=${SERVICE_PASSWORD:-$ADMIN_PASSWORD}\n",
@@ -313,8 +319,8 @@
             "  exit 1\n",
             "}\n",
             "cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r KeystoneServer ",
-            "    --access-key ",  { "Ref" : "OpenstackUserAccessKey" },
-            "    --secret-key ", {"Fn::GetAtt": ["OpenstackUserAccessKey", "SecretAccessKey"]},
+            "    --access-key ",  { "Ref" : "OpenStackUserAccessKey" },
+            "    --secret-key ", {"Fn::GetAtt": ["OpenStackUserAccessKey", "SecretAccessKey"]},
             "    --region ", { "Ref" : "AWS::Region" }, 
             "    --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
             "# All is well so signal success\n",
@@ -507,8 +513,8 @@
           "  exit 1\n",
           "}\n",
           "cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r SwiftNodeServer ",
-          "    --access-key ",  { "Ref" : "OpenstackUserAccessKey" },
-          "    --secret-key ", {"Fn::GetAtt": ["OpenstackUserAccessKey", "SecretAccessKey"]},
+          "    --access-key ",  { "Ref" : "OpenStackUserAccessKey" },
+          "    --secret-key ", {"Fn::GetAtt": ["OpenStackUserAccessKey", "SecretAccessKey"]},
           "    --region ", { "Ref" : "AWS::Region" }, 
           "    --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
           "# All is well so signal success\n",
@@ -548,8 +554,66 @@
         "Metadata" : {
           "AWS::CloudFormation::Init" : {
             "configSets" : {
-              "fullinstall" : [ "setup_swiftproxy" ]
+              "fullinstall" : [ "setup_swiftproxy", "create_ring" ]
             },
+            
+            "create_ring" : {
+              "packages" : {
+                "apt" : {
+                  "default-jre"        : [],
+                  "unzip"              : []
+                }
+              },
+              "sources" : {
+                "/opt"            : "http://s3.amazonaws.com/ec2-downloads/ec2-api-tools.zip"
+              },
+              "files" : {
+                "/opt/osonaws/create_ring" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#! /bin/bash\n",
+                    "export EC2_HOME=/opt/ec2-api-tools-1.6.5.4\n",
+                    "export JAVA_HOME=/usr\n",
+                    "export AWS_ACCESS_KEY=", {"Ref" : "OpenStackUserAccessKey"} , "\n",
+                    "export AWS_SECRET_KEY=",  {"Fn::GetAtt" : ["OpenStackUserAccessKey", "SecretAccessKey"]}, "\n",
+                    "export PATH=$PATH:$EC2_HOME/bin\n",
+                    "chmod +x $EC2_HOME/bin/*\n",
+                        
+                    "SWIFT_NODES_IP=$(ec2-describe-instances --region ", { "Ref" : "AWS::Region" } ," | grep ", {"Ref" : "SwiftNodesGroup"} , " | cut -f 3)\n",
+                    "ZONE=\"1\"\n",
+                        
+                    "cd /etc/swift\n",
+                    "swift-ring-builder account.builder create 18 ", { "Ref" : "SwiftNodeNumber" } ," 1\n",
+                    "swift-ring-builder container.builder create 18 ", { "Ref" : "SwiftNodeNumber" } ," 1\n",
+                    "swift-ring-builder object.builder create 18 ", { "Ref" : "SwiftNodeNumber" } ," 1\n",
+                        
+                    "for instance in $SWIFT_NODES_IP\n",
+                    "do\n",
+                    "NODE_IP=$(ec2-describe-instances --region ", { "Ref" : "AWS::Region" } ," | grep $instance | grep INSTANCE | cut -f 18)\n",
+                    "swift-ring-builder account.builder add z${ZONE}-${NODE_IP}:6002/xvdb 100\n",
+                    "swift-ring-builder container.builder add z${ZONE}-${NODE_IP}:6001/xvdb 100\n",
+                    "swift-ring-builder object.builder add z${ZONE}-${NODE_IP}:6000/xvdb 100\n",
+                    "ZONE=$(($ZONE+1))\n",
+                    "done\n",
+
+                    "swift-ring-builder account.builder rebalance\n",
+                    "swift-ring-builder container.builder rebalance\n",
+                    "swift-ring-builder object.builder rebalance\n",
+                    "swift-init proxy start\n",
+                        
+                    "exit 0\n"
+                  ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                }
+              },
+              "commands" : {
+                "01_create_ring" : {
+                  "command" : "/opt/osonaws/create_ring"
+                }
+              }
+            },
+            
             "setup_swiftproxy" : {
               "packages" : {
                 "apt" : {
@@ -650,8 +714,8 @@
           "  exit 1\n",
           "}\n",
           "cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r SwiftProxyServer ",
-          "    --access-key ",  { "Ref" : "OpenstackUserAccessKey" },
-          "    --secret-key ", {"Fn::GetAtt": ["OpenstackUserAccessKey", "SecretAccessKey"]},
+          "    --access-key ",  { "Ref" : "OpenStackUserAccessKey" },
+          "    --secret-key ", {"Fn::GetAtt": ["OpenStackUserAccessKey", "SecretAccessKey"]},
           "    --region ", { "Ref" : "AWS::Region" }, 
           "    --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
           "# All is well so signal success\n",
@@ -660,12 +724,12 @@
         }
       }
     }    
-  }
+  },
   
   "Outputs" : {
-    "Swift command" : {
-	  "Value" : { "Fn::Join" : ["", ["swift -V 2.0 -A http://", { "Ref" : "KeystoneIPAddress" }, "/v2.0 -U service:swift -K ", { "Ref" : "KeystoneSwiftUserPassword" }, " stat" ]] },
-	  "Description" : "Command to execute to test the cluster with swift client."	
+    "SwiftCommand" : {
+      "Value" : { "Fn::Join" : ["", ["swift -V 2.0 -A http://", { "Ref" : "KeystoneIPAddress" }, "/v2.0 -U service:swift -K ", { "Ref" : "KeystoneSwiftUserPassword" }, " stat" ]] },
+      "Description" : "Command to execute to test the cluster with swift client."    
     }
   }
 }
