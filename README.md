@@ -12,5 +12,6 @@ BE CAREFUL : by default 5 EC2 instances (Keystone, SwiftProxy, 3x SwiftNodes) ar
 
 # Start a QA Cloud
 
-Load one template in AWS Cloudformation. Connection are (will be) in the output.
-Templates are AMI/AWS account/zone free and doesn't use any private software/data.
+Load swift template in AWS Cloudformation. 
+
+See the output and launch the command from a system with swift client installed.
