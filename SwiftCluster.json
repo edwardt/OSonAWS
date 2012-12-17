@@ -75,13 +75,13 @@
     
     "SwiftNodeDiskSize": {
       "Default": "1",
-      "Description" : "Dedicated disk for swift",
+      "Description" : "Size of dedicated disk for swift (Go)",
       "Type": "String"
     },
 
     "SwiftNodeNumber": {
       "Default": "3",
-      "Description" : "Number of Swift nodes",
+      "Description" : "Number of Swift nodes. One zone is created per node.",
       "Type": "String"
     },
     
@@ -90,6 +90,7 @@
         "Description" : "A public key. Can be yours",
         "Type": "String"
     },
+    
     "SSHprivateKeyURL": {
         "Default": "https://s3-ap-southeast-1.amazonaws.com/osonaws/id_dsa",
         "Description" : "A private key. Can be yours",
