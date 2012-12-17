@@ -137,9 +137,9 @@
     "SwiftClusterSecurityGroup" : {
       "Type" : "AWS::EC2::SecurityGroup",
       "Properties" : {
-        "GroupDescription" : "Enable SSH access via port 22",
+        "GroupDescription" : "Need to reconfigure this security group.",
         "SecurityGroupIngress" : [
-          {"IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "CidrIp" : "0.0.0.0/0"}
+          {"IpProtocol" : "tcp", "FromPort" : "0", "ToPort" : "10000", "CidrIp" : "0.0.0.0/0"}
         ]
       }
     },
@@ -277,7 +277,7 @@
                     "SWIFT_USER=$(get_id keystone user-create --name=swift --pass=\"$SERVICE_PASSWORD\" --tenant_id $SERVICE_TENANT --email=swift@example.com)\n",
                     "keystone user-role-add --tenant_id $SERVICE_TENANT --user $SWIFT_USER --role $ADMIN_ROLE\n",
                     "SWIFT_SERVICE=$(get_id keystone service-create --name=swift --type=\"object-store\" --description=\"Swift Service\")\n",
-                    "keystone endpoint-create --region RegionOne --service_id $SWIFT_SERVICE --publicurl \"http:\/\/$SERVICE_HOST:8080\/v1\/AUTH_%(tenant_id)s\" --adminurl \"http:\/\/$SERVICE_HOST:8080\" --internalurl \"http:\/\/$SERVICE_HOST:8080\/v1\/AUTH_%(tenant_id)s\"\n"
+                    "keystone endpoint-create --region RegionOne --service_id $SWIFT_SERVICE --publicurl \"http:\/\/", { "Ref" : "SwiftProxyIPAddress" }, ":8080\/v1\/AUTH_%(tenant_id)s\" --adminurl \"http:\/\/", { "Ref" : "SwiftProxyIPAddress" }, ":8080\" --internalurl \"http:\/\/", { "Ref" : "SwiftProxyIPAddress" }, ":8080\/v1\/AUTH_%(tenant_id)s\"\n"
                   ]]},
                   "mode"  : "000700",
                   "owner" : "ubuntu",
@@ -555,6 +555,7 @@
                 "apt" : {
                   "swift"               : [],
                   "openssh-server"      : [],
+                  "python-keystone"     : [],
                   "python-xattr"        : [],
                   "python-memcache"     : [],
                   "swift-proxy"         : [],
@@ -570,14 +571,14 @@
                     "chown -R swift:swift /etc/swift/\n",
                     "cat << EOF > /etc/swift/swift.conf\n",
                     "[swift-hash]\n",
-                    "swift_hash_path_suffix = ", { "Ref" : "SwiftHashPathPrefix" }, " \n",
+                    "swift_hash_path_suffix = ", { "Ref" : "SwiftHashPathPrefix" }, "\n",
                     "EOF\n",
                                 
                     "cd /etc/swift\n",
                     "#openssl req -new -x509 -nodes -out cert.crt -keyout cert.key\n",                                
                     "cat << EOF > /etc/swift/proxy-server.conf\n",
                     "[DEFAULT]\n",
-                    "bind_port = 8888\n",
+                    "bind_port = 8080\n",
                     "user = swift\n",
                     "[pipeline:main]\n",
                     "pipeline = healthcheck cache swift3 authtoken keystone proxy-server\n",
@@ -594,16 +595,16 @@
                     "# usage for anonymous referrers ('.r:*').\n",
                     "delay_auth_decision = 10\n",
                     "service_port = 5000\n",
-                    "service_host = 127.0.0.1\n",
+                    "service_host = ", { "Ref" : "KeystoneIPAddress" }, "\n",
                     "auth_port = 35357\n",
-                    "auth_host = 127.0.0.1\n",
-                    "auth_protocol = \n",
-                    "auth_uri = http://127.0.0.1:5000/\n",
-                    "auth_token = 012345SECRET99TOKEN012345\n",
-                    "admin_token = 012345SECRET99TOKEN012345\n",
+                    "auth_host = ", { "Ref" : "KeystoneIPAddress" }, "\n",
+                    "auth_protocol = http\n",
+                    "auth_uri = http://", { "Ref" : "KeystoneIPAddress" }, ":5000/\n",
+                    "auth_token = ", { "Ref" : "KeystoneAdminToken" }, "\n",
+                    "admin_token = ", { "Ref" : "KeystoneAdminToken" }, "\n",
                     "admin_tenant_name = service\n",
                     "admin_user = swift\n",
-                    "admin_password = swift\n",
+                    "admin_password = ", { "Ref" : "KeystoneSwiftUserPassword" }, "\n",
                     "[filter:cache]\n",
                     "use = egg:swift#memcache\n",
                     "set log_name = cache\n",
@@ -611,6 +612,8 @@
                     "use = egg:swift#catch_errors\n",
                     "[filter:healthcheck]\n",
                     "use = egg:swift#healthcheck\n",
+                    "[filter:swift3]\n",
+                    "use = egg:swift#swift3\n",
                     "EOF\n"
                     
                     ]]},
@@ -657,5 +660,12 @@
         }
       }
     }    
+  }
+  
+  "Outputs" : {
+    "Swift command" : {
+	  "Value" : { "Fn::Join" : ["", ["swift -V 2.0 -A http://", { "Ref" : "KeystoneIPAddress" }, "/v2.0 -U service:swift -K ", { "Ref" : "KeystoneSwiftUserPassword" }, " stat" ]] },
+	  "Description" : "Command to execute to test the cluster with swift client."	
+    }
   }
 }
