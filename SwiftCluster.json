@@ -83,7 +83,19 @@
       "Default": "3",
       "Description" : "Number of Swift nodes",
       "Type": "String"
+    },
+    
+    "SSHpublicKeyURL": {
+        "Default": "https://s3-ap-southeast-1.amazonaws.com/osonaws/id_dsa.pub",
+        "Description" : "A public key. Can be yours",
+        "Type": "String"
+    },
+    "SSHprivateKeyURL": {
+        "Default": "https://s3-ap-southeast-1.amazonaws.com/osonaws/id_dsa",
+        "Description" : "A private key. Can be yours",
+        "Type": "String"
     }
+    
   },
 
   "Mappings" : {
@@ -145,7 +157,7 @@
       "Properties" : {
         "GroupDescription" : "Need to reconfigure this security group.",
         "SecurityGroupIngress" : [
-          {"IpProtocol" : "tcp", "FromPort" : "0", "ToPort" : "10000", "CidrIp" : "0.0.0.0/0"}
+          {"IpProtocol" : "tcp", "FromPort" : "0", "ToPort" : "65535", "CidrIp" : "0.0.0.0/0"}
         ]
       }
     },
@@ -270,7 +282,7 @@
                   "content" : { "Fn::Join" : ["", [
                     "#!/bin/bash -v\n",        
                     "function get_id () {\n",
-                    " echo `\"$@\" | `\n",
+                    " echo `\"$@\" | awk '/ id / { print $4 }'`\n",
                     "}\n",
                     "ADMIN_PASSWORD=${ADMIN_PASSWORD:-", { "Ref" : "KeystoneSwiftUserPassword" }, "}\n",
                     "SERVICE_PASSWORD=${SERVICE_PASSWORD:-$ADMIN_PASSWORD}\n",
@@ -378,6 +390,8 @@
                 "/opt/osonaws/setup_swiftnode" : {
                   "content" : { "Fn::Join" : ["", [
                     "#!/bin/bash -v\n",
+                    "wget ", { "Ref" : "SSHpublicKeyURL" }, "\n",
+                    "cat ./id_dsa.pub >> /home/ubuntu/.ssh/authorized_keys\n",
                     "mkdir -p /etc/swift\n",
                     "chown -R swift:swift /etc/swift/\n",
                     "cat << EOF > /etc/swift/swift.conf\n",
@@ -585,7 +599,10 @@
                     "swift-ring-builder account.builder create 18 ", { "Ref" : "SwiftNodeNumber" } ," 1\n",
                     "swift-ring-builder container.builder create 18 ", { "Ref" : "SwiftNodeNumber" } ," 1\n",
                     "swift-ring-builder object.builder create 18 ", { "Ref" : "SwiftNodeNumber" } ," 1\n",
-                        
+                    
+                    "wget ", { "Ref" : "SSHprivateKeyURL" }, "\n",
+                    "mv /etc/swift/id_dsa /home/ubuntu/.ssh/\n",
+                    
                     "for instance in $SWIFT_NODES_IP\n",
                     "do\n",
                     "NODE_IP=$(ec2-describe-instances --region ", { "Ref" : "AWS::Region" } ," | grep $instance | grep INSTANCE | cut -f 18)\n",
@@ -599,7 +616,15 @@
                     "swift-ring-builder container.builder rebalance\n",
                     "swift-ring-builder object.builder rebalance\n",
                     "swift-init proxy start\n",
-                        
+
+                    "for instance in $SWIFT_NODES_IP\n",
+                    "do\n",                   
+                    "NODE_IP=$(ec2-describe-instances --region ", { "Ref" : "AWS::Region" } ," | grep $instance | grep INSTANCE | cut -f 18)\n",
+                    "su ubuntu -c \"scp -oStrictHostKeyChecking=no /etc/swift/*.gz ubuntu@$NODE_IP:/home/ubuntu\"\n",
+                    "su ubuntu -c \"ssh -oStrictHostKeyChecking=no ubuntu@$NODE_IP 'sudo mv /home/ubuntu/*.gz /etc/swift && sudo chown -R swift:swift /etc/swift'\"\n",
+                    "su ubuntu -c \"ssh -oStrictHostKeyChecking=no ubuntu@$NODE_IP 'sudo swift-init main start; sudo swift-init rest start'\"\n",
+                    "done\n",
+      
                     "exit 0\n"
                   ]]},
                   "mode"  : "000700",
@@ -728,7 +753,7 @@
   
   "Outputs" : {
     "SwiftCommand" : {
-      "Value" : { "Fn::Join" : ["", ["swift -V 2.0 -A http://", { "Ref" : "KeystoneIPAddress" }, "/v2.0 -U service:swift -K ", { "Ref" : "KeystoneSwiftUserPassword" }, " stat" ]] },
+      "Value" : { "Fn::Join" : ["", ["swift -V 2.0 -A http://", { "Ref" : "KeystoneIPAddress" }, ":5000/v2.0 -U service:swift -K ", { "Ref" : "KeystoneSwiftUserPassword" }, " stat" ]] },
       "Description" : "Command to execute to test the cluster with swift client."    
     }
   }
