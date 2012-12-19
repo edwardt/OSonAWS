@@ -86,17 +86,46 @@
     },
     
     "SSHpublicKeyURL": {
-        "Default": "https://s3-ap-southeast-1.amazonaws.com/osonaws/id_dsa.pub",
-        "Description" : "A public key. Can be yours",
-        "Type": "String"
+      "Default": "https://s3-ap-southeast-1.amazonaws.com/osonaws/id_dsa.pub",
+      "Description" : "A public key. Can be yours",
+      "Type": "String"
     },
     
     "SSHprivateKeyURL": {
-        "Default": "https://s3-ap-southeast-1.amazonaws.com/osonaws/id_dsa",
-        "Description" : "A private key. Can be yours",
-        "Type": "String"
-    }
+      "Default": "https://s3-ap-southeast-1.amazonaws.com/osonaws/id_dsa",
+      "Description" : "A private key. Can be yours",
+      "Type": "String"
+    },
     
+    "GlanceMysqlRootPassword": {
+      "Default": "WSORa6xTu2",
+      "Description" : "Glance's MySQL root password",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "64",
+      "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
+      "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
+    },
+      
+    "GlanceMysqlUserPassword": {
+      "Default": "IWur6lc2CQ",
+      "Description" : "Glance's MySQL user password",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "64",
+      "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
+      "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
+    },
+      
+    "KeystoneGlanceUserPassword": {
+      "Default": "icXyuCaywR",
+      "Description" : "Keystone Glance user password",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "64",
+      "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
+      "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
+    }
   },
 
   "Mappings" : {
@@ -189,155 +218,172 @@
     },
     
     "KeystoneServer": {
-      "Type": "AWS::EC2::Instance",
-        "Metadata" : {
-          "AWS::CloudFormation::Init" : {
-            "configSets" : {
-              "fullinstall" : [ "setup_seed", "setup_database", "setup_keystone" ]
-             },
-            "setup_seed" : {
-              "files" : {
-                "/opt/osonaws/tmp/all.preseed" : {
-                  "content" : { "Fn::Join" : ["", [
-                    "mysql-server mysql-server/root_password password ", { "Ref" : "KeystoneMysqlRootPassword" }, "\n",
-                    "mysql-server mysql-server/root_password_again password ", { "Ref" : "KeystoneMysqlRootPassword" }, "\n",
-                    "mysql-server mysql-server/start_on_boot boolean true\n"
-                  ]]},
-                  "mode"  : "000600",
-                  "owner" : "ubuntu",
-                  "group" : "ubuntu"
+        "Type": "AWS::EC2::Instance",
+          "Metadata" : {
+            "AWS::CloudFormation::Init" : {
+              "configSets" : {
+                "fullinstall" : [ "setup_seed", "setup_database", "setup_keystone" ]
+               },
+              "setup_seed" : {
+                "files" : {
+                  "/opt/osonaws/tmp/all.preseed" : {
+                    "content" : { "Fn::Join" : ["", [
+                      "mysql-server mysql-server/root_password password ", { "Ref" : "KeystoneMysqlRootPassword" }, "\n",
+                      "mysql-server mysql-server/root_password_again password ", { "Ref" : "KeystoneMysqlRootPassword" }, "\n",
+                      "mysql-server mysql-server/start_on_boot boolean true\n"
+                    ]]},
+                    "mode"  : "000600",
+                    "owner" : "ubuntu",
+                    "group" : "ubuntu"
+                  },
+                  "/opt/osonaws/tmp/setup_seed" : {
+                    "content" : { "Fn::Join" : ["", [
+                      "#!/bin/bash -v\n",
+                      "debconf-set-selections < /opt/osonaws/tmp/all.preseed\n"
+                    ]]},
+                    "mode"  : "000700",
+                    "owner" : "ubuntu",
+                    "group" : "ubuntu"
+                  }
                 },
-                "/opt/osonaws/tmp/setup_seed" : {
-                  "content" : { "Fn::Join" : ["", [
-                    "#!/bin/bash -v\n",
-                    "debconf-set-selections < /opt/osonaws/tmp/all.preseed\n"
-                  ]]},
-                  "mode"  : "000700",
-                  "owner" : "ubuntu",
-                  "group" : "ubuntu"
+                "commands" : {
+                  "01_seed" : {
+                    "command" : "/opt/osonaws/tmp/setup_seed"
+                  }
                 }
               },
-              "commands" : {
-                "01_seed" : {
-                  "command" : "/opt/osonaws/tmp/setup_seed"
-                }
-              }
-            },
-            "setup_database" : {
-              "packages" : {
-                "apt" : {
-                  "mysql-server"            : []
-                }
-              },
-              "files" : {
-                "/opt/osonaws/setup.mysql" : {
-                  "content" : { "Fn::Join" : ["", [
-                    "CREATE DATABASE keystone;\n",
-                    "GRANT ALL ON keystone.* TO 'keystone'@'%' IDENTIFIED BY '", { "Ref" : "KeystoneMysqlUserPassword" }, "';\n",
-                    "GRANT ALL ON keystone.* TO 'keystone'@'localhost' IDENTIFIED BY '", { "Ref" : "KeystoneMysqlUserPassword" }, "';\n"
-                  ]]},
-                  "mode"  : "000600",
-                  "owner" : "ubuntu",
-                  "group" : "ubuntu"
+              "setup_database" : {
+                "packages" : {
+                  "apt" : {
+                    "mysql-server"            : []
+                  }
                 },
-                "/opt/osonaws/setup_database" : {
-                  "content" : { "Fn::Join" : ["", [
-                    "#!/bin/bash -v\n",
-                    "mysql -u root --password='", { "Ref" : "KeystoneMysqlRootPassword" }, "' < /opt/osonaws/setup.mysql\n"
-                  ]]},
-                  "mode"  : "000700",
-                  "owner" : "ubuntu",
-                  "group" : "ubuntu"
-                }
-              },
-              "commands" : {
-                "01_setup_database" : {
-                  "command" : "/opt/osonaws/setup_database"
-                }
-              }
-            },
-            "setup_keystone" : {
-              "packages" : {
-                "apt" : {
-                  "keystone"                 : [],
-                  "python-mysqldb"           : []
-                }
-              },
-              "files" : {
-                "/opt/osonaws/setup_keystone" : {
-                  "content" : { "Fn::Join" : ["", [
-                    "#!/bin/bash -v\n",
-                    "rm /var/lib/keystone/keystone.db\n",
-                    "sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mysql/my.cnf\n",
-                    "sed -i \"s/sqlite:\\/\\/\\/\\/var\\/lib\\/keystone\\/keystone.db\/mysql:\\/\\/keystone:", { "Ref" : "KeystoneMysqlUserPassword" }, "@0.0.0.0\\/keystone\/g\" /etc/keystone/keystone.conf\n",
-                    "sed -i \"s/admin_token = ADMIN/admin_token = ", { "Ref" : "KeystoneAdminToken" }, "/g\" /etc/keystone/keystone.conf\n",
-                    "service mysql restart\n",
-                    "service keystone restart\n",
-                    "keystone-manage db_sync\n"
-                  ]]},
-                  "mode"  : "000700",
-                  "owner" : "ubuntu",
-                  "group" : "ubuntu"
+                "files" : {
+                  "/opt/osonaws/setup.mysql" : {
+                    "content" : { "Fn::Join" : ["", [
+                      "CREATE DATABASE keystone;\n",
+                      "GRANT ALL ON keystone.* TO 'keystone'@'%' IDENTIFIED BY '", { "Ref" : "KeystoneMysqlUserPassword" }, "';\n",
+                      "GRANT ALL ON keystone.* TO 'keystone'@'localhost' IDENTIFIED BY '", { "Ref" : "KeystoneMysqlUserPassword" }, "';\n"
+                    ]]},
+                    "mode"  : "000600",
+                    "owner" : "ubuntu",
+                    "group" : "ubuntu"
+                  },
+                  "/opt/osonaws/setup_database" : {
+                    "content" : { "Fn::Join" : ["", [
+                      "#!/bin/bash -v\n",
+                      "mysql -u root --password='", { "Ref" : "KeystoneMysqlRootPassword" }, "' < /opt/osonaws/setup.mysql\n"
+                    ]]},
+                    "mode"  : "000700",
+                    "owner" : "ubuntu",
+                    "group" : "ubuntu"
+                  }
                 },
-                "/opt/osonaws/setup_keystone_data" : {
-                  "content" : { "Fn::Join" : ["", [
-                    "#!/bin/bash -v\n",        
-                    "function get_id () {\n",
-                    " echo `\"$@\" | awk '/ id / { print $4 }'`\n",
-                    "}\n",
-                    "ADMIN_PASSWORD=${ADMIN_PASSWORD:-", { "Ref" : "KeystoneSwiftUserPassword" }, "}\n",
-                    "SERVICE_PASSWORD=${SERVICE_PASSWORD:-$ADMIN_PASSWORD}\n",
-                    "SERVICE_TENANT_NAME=${SERVICE_TENANT_NAME:-service}\n",
-                    "SERVICE_HOST='127.0.0.1'\n",
-                    "export SERVICE_TOKEN='", { "Ref" : "KeystoneAdminToken" }, "'\n",
-                    "export SERVICE_ENDPOINT='http://0.0.0.0:35357/v2.0'\n",
-                    "SERVICE_TENANT=$(get_id keystone tenant-create --name=\"$SERVICE_TENANT_NAME\")\n",
-                    "ADMIN_ROLE=$(get_id keystone role-create --name=admin)\n",
-                    "SWIFT_USER=$(get_id keystone user-create --name=swift --pass=\"$SERVICE_PASSWORD\" --tenant_id $SERVICE_TENANT --email=swift@example.com)\n",
-                    "keystone user-role-add --tenant_id $SERVICE_TENANT --user $SWIFT_USER --role $ADMIN_ROLE\n",
-                    "SWIFT_SERVICE=$(get_id keystone service-create --name=swift --type=\"object-store\" --description=\"Swift Service\")\n",
-                    "keystone endpoint-create --region RegionOne --service_id $SWIFT_SERVICE --publicurl \"http:\/\/", { "Ref" : "SwiftProxyIPAddress" }, ":8080\/v1\/AUTH_%(tenant_id)s\" --adminurl \"http:\/\/", { "Ref" : "SwiftProxyIPAddress" }, ":8080\" --internalurl \"http:\/\/", { "Ref" : "SwiftProxyIPAddress" }, ":8080\/v1\/AUTH_%(tenant_id)s\"\n"
-                  ]]},
-                  "mode"  : "000700",
-                  "owner" : "ubuntu",
-                  "group" : "ubuntu"
+                "commands" : {
+                  "01_setup_database" : {
+                    "command" : "/opt/osonaws/setup_database"
+                  }
                 }
               },
-              "commands" : {
-                "01_setup_keystone" : {
-                  "command" : "/opt/osonaws/setup_keystone"
+              "setup_keystone" : {
+                "packages" : {
+                  "apt" : {
+                    "keystone"                 : [],
+                    "python-mysqldb"           : [],
+                    "python-keystoneclient"    : []
+                  }
                 },
-                "02_setup_keystone_data" : {
-                  "command" : "/opt/osonaws/setup_keystone_data"
+                "files" : {
+                  "/opt/osonaws/setup_keystone" : {
+                    "content" : { "Fn::Join" : ["", [
+                      "#!/bin/bash -v\n",
+                      "rm /var/lib/keystone/keystone.db\n",
+                      "sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mysql/my.cnf\n",
+                      "sed -i \"s/sqlite:\\/\\/\\/\\/var\\/lib\\/keystone\\/keystone.db\/mysql:\\/\\/keystone:", { "Ref" : "KeystoneMysqlUserPassword" }, "@0.0.0.0\\/keystone\/g\" /etc/keystone/keystone.conf\n",
+                      "sed -i \"s/# admin_token = ADMIN/admin_token = ", { "Ref" : "KeystoneAdminToken" }, "/g\" /etc/keystone/keystone.conf\n",
+                      "sed -i \"s/# bind_host/bind_host/g\" /etc/keystone/keystone.conf\n",
+                      "sed -i \"s/# public_port/public_port/g\" /etc/keystone/keystone.conf\n",
+                      "sed -i \"s/# public_port/public_port/g\" /etc/keystone/keystone.conf\n",
+                      "sed -i \"s/# compute_port/compute_port/g\" /etc/keystone/keystone.conf\n",
+                      "service mysql restart\n",
+                      "service keystone restart\n",
+                      "keystone-manage db_sync\n"
+                    ]]},
+                    "mode"  : "000700",
+                    "owner" : "ubuntu",
+                    "group" : "ubuntu"
+                  },
+                  "/opt/osonaws/setup_keystone_data" : {
+                    "content" : { "Fn::Join" : ["", [
+                      "#!/bin/bash -v\n",        
+                      "function get_id () {\n",
+                      " echo `\"$@\" | awk '/ id / { print $4 }'`\n",
+                      "}\n",
+
+                      "SERVICE_TENANT_NAME=${SERVICE_TENANT_NAME:-service}\n",
+                      "SERVICE_HOST='127.0.0.1'\n",
+                      "export SERVICE_TOKEN='", { "Ref" : "KeystoneAdminToken" }, "'\n",
+                      "export SERVICE_ENDPOINT='http://0.0.0.0:35357/v2.0'\n",
+                      
+                      "SERVICE_TENANT=$(get_id keystone tenant-create --name=\"$SERVICE_TENANT_NAME\")\n",
+                      "ADMIN_ROLE=$(get_id keystone role-create --name=admin)\n",
+                      
+                      "#Swift user and endpoint\n",
+                      "SWIFT_USER=$(get_id keystone user-create --name=swift --pass=\"", { "Ref" : "KeystoneSwiftUserPassword" }, "\" --tenant-id $SERVICE_TENANT --email=swift@example.com)\n",
+                      "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $SWIFT_USER --role-id $ADMIN_ROLE\n",
+                      "SWIFT_SERVICE=$(get_id keystone service-create --name=swift --type=\"object-store\" --description=\"Swift Service\")\n",
+                      "keystone endpoint-create --region RegionOne --service-id $SWIFT_SERVICE --publicurl \"http:\/\/", { "Ref" : "SwiftProxyIPAddress" }, ":8080\/v1\/AUTH_%(tenant_id)s\" --adminurl \"http:\/\/", { "Ref" : "SwiftProxyIPAddress" }, ":8080\" --internalurl \"http:\/\/", { "Ref" : "SwiftProxyIPAddress" }, ":8080\/v1\/AUTH_%(tenant_id)s\"\n",
+                      
+                      "#Glance user and endpoint\n",
+                      "GLANCE_USER=$(get_id keystone user-create --name=glance --pass=\"", { "Ref" : "KeystoneGlanceUserPassword" }, "\" --tenant-id $SERVICE_TENANT --email=glance@domain.com)\n",
+                      "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $GLANCE_USER --role-id $ADMIN_ROLE\n",
+                      "GLANCE_SERVICE=$(get_id keystone service-create --name=glance --type image --description 'OpenStack Image Service')\n",
+                      "keystone endpoint-create --region RegionOne --service-id $GLANCE_SERVICE --publicurl \"http:\/\/", { "Ref" : "GlanceIPAddress" }, ":9292/v2\" --adminurl \"http:\/\/", { "Ref" : "GlanceIPAddress" }, ":9292/v2\" --internalurl \"http:\/\/", { "Ref" : "GlanceIPAddress" }, ":9292/v2\"\n"
+
+                    ]]},
+                    "mode"  : "000700",
+                    "owner" : "ubuntu",
+                    "group" : "ubuntu"
+                  }
+                },
+                "commands" : {
+                  "01_setup_keystone" : {
+                    "command" : "/opt/osonaws/setup_keystone"
+                  },
+                  "02_setup_keystone_data" : {
+                    "command" : "/opt/osonaws/setup_keystone_data"
+                  }
                 }
               }
             }
-          }
-        },
-        "Properties" : {
-          "KeyName" : { "Ref" : "KeyName" },
-          "InstanceType": { "Ref": "InstanceType" },
-          "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, "64" ] },
-          "SecurityGroups" : [ {"Ref" : "SwiftClusterSecurityGroup"} ],
-          "Monitoring" : "false",
-          "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
-            "#! /bin/bash\n",
-            "# -- Update\n",
-            "apt-get update\n",
-            "apt-get -y install python-setuptools\n",
-            "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",    
-            "function error_exit\n",
-            "{\n",
-            "  cfn-signal -e 1 -r \"$1\" '", { "Ref" : "KeystoneWaitHandle" }, "'\n",
-            "  exit 1\n",
-            "}\n",
-            "cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r KeystoneServer ",
-            "    --access-key ",  { "Ref" : "OpenStackUserAccessKey" },
-            "    --secret-key ", {"Fn::GetAtt": ["OpenStackUserAccessKey", "SecretAccessKey"]},
-            "    --region ", { "Ref" : "AWS::Region" }, 
-            "    --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
-            "# All is well so signal success\n",
-            "cfn-signal -e 0 -r \"Keystone setup complete\" '", { "Ref" : "KeystoneWaitHandle" }, "'\n"
+          },
+          "Properties" : {
+            "KeyName" : { "Ref" : "KeyName" },
+            "InstanceType": { "Ref": "InstanceType" },
+            "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, "64" ] },
+            "SecurityGroups" : [ {"Ref" : "SwiftClusterSecurityGroup"} ],
+            "Monitoring" : "false",
+            "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
+               "#! /bin/bash\n",
+               "# -- Update\n",
+               "apt-get install ubuntu-cloud-keyring\n",
+               "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
+               "echo 'APT::Get::AllowUnauthenticated \"true\";' >> /etc/apt/apt.conf.d/70debconf\n",
+               "apt-get update && apt-get upgrade -y --force-yes\n",
+               "apt-get -y install python-setuptools\n",
+               "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",    
+               "function error_exit\n",
+               "{\n",
+               "  cfn-signal -e 1 -r \"$1\" '", { "Ref" : "KeystoneWaitHandle" }, "'\n",
+               "  exit 1\n",
+               "}\n",
+               "cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r KeystoneServer ",
+               "    --access-key ",  { "Ref" : "OpenStackUserAccessKey" },
+               "    --secret-key ", {"Fn::GetAtt": ["OpenStackUserAccessKey", "SecretAccessKey"]},
+               "    --region ", { "Ref" : "AWS::Region" }, 
+               "    --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
+               "# All is well so signal success\n",
+               "cfn-signal -e 0 -r \"Keystone setup complete\" '", { "Ref" : "KeystoneWaitHandle" }, "'\n"
           ]]}
         }
       }
@@ -586,7 +632,8 @@
                 "/opt/osonaws/create_ring" : {
                   "content" : { "Fn::Join" : ["", [
                     "#! /bin/bash\n",
-                    "export EC2_HOME=/opt/ec2-api-tools-1.6.5.4\n",
+                    "mv /opt/ec2-api-tools-* /opt/ec2-api-tools\n",
+                    "export EC2_HOME=/opt/ec2-api-tools\n",
                     "export JAVA_HOME=/usr\n",
                     "export AWS_ACCESS_KEY=", {"Ref" : "OpenStackUserAccessKey"} , "\n",
                     "export AWS_SECRET_KEY=",  {"Fn::GetAtt" : ["OpenStackUserAccessKey", "SecretAccessKey"]}, "\n",
@@ -749,11 +796,182 @@
           ]]}
         }
       }
-    }    
+    },
+    
+    "GlanceWaitHandle" : {
+      "Type" : "AWS::CloudFormation::WaitConditionHandle"
+    },
+      
+    "GlanceWaitCondition" : {
+      "Type" : "AWS::CloudFormation::WaitCondition",
+      "DependsOn" : "GlanceServer",
+      "Properties" : {
+        "Handle" : {"Ref" : "GlanceWaitHandle"},
+        "Timeout" : "1200"
+      }
+    },      
+      
+    "GlanceIPAddress" : {
+      "Type" : "AWS::EC2::EIP"
+    },
+
+    "GlanceIPAssoc" : {
+      "Type" : "AWS::EC2::EIPAssociation",
+      "Properties" : {
+        "InstanceId" : { "Ref" : "GlanceServer" },
+        "EIP" : { "Ref" : "GlanceIPAddress" }
+      }
+    },
+      
+    "GlanceServer": {
+      "Type": "AWS::EC2::Instance",
+        "Metadata" : {
+          "AWS::CloudFormation::Init" : {
+            "configSets" : {
+              "fullinstall" : [ "setup_seed", "setup_database", "setup_glance" ]
+             },
+            "setup_seed" : {
+              "files" : {
+                "/opt/osonaws/tmp/all.preseed" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "mysql-server mysql-server/root_password password ", { "Ref" : "GlanceMysqlRootPassword" }, "\n",
+                    "mysql-server mysql-server/root_password_again password ", { "Ref" : "GlanceMysqlRootPassword" }, "\n",
+                    "mysql-server mysql-server/start_on_boot boolean true\n"
+                  ]]},
+                  "mode"  : "000600",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                },
+                "/opt/osonaws/tmp/setup_seed" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -v\n",
+                    "debconf-set-selections < /opt/osonaws/tmp/all.preseed\n"
+                  ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                }
+              },
+              "commands" : {
+                "01_seed" : {
+                  "command" : "/opt/osonaws/tmp/setup_seed"
+                }
+              }
+            },
+            "setup_database" : {
+              "packages" : {
+                "apt" : {
+                  "mysql-server"            : []
+                }
+              },
+              "files" : {
+                "/opt/osonaws/setup.mysql" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "CREATE DATABASE glance;\n",
+                    "GRANT ALL ON glance.* TO 'glance'@'%' IDENTIFIED BY '", { "Ref" : "GlanceMysqlUserPassword" }, "';\n",
+                    "GRANT ALL ON glance.* TO 'glance'@'localhost' IDENTIFIED BY '", { "Ref" : "GlanceMysqlUserPassword" }, "';\n"
+                  ]]},
+                  "mode"  : "000600",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                },
+                "/opt/osonaws/setup_database" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -v\n",
+                    "mysql -u root --password='", { "Ref" : "GlanceMysqlRootPassword" }, "' < /opt/osonaws/setup.mysql\n"
+                  ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                }
+              },
+              "commands" : {
+                "01_setup_database" : {
+                  "command" : "/opt/osonaws/setup_database"
+                }
+              }
+            },
+            "setup_glance" : {
+              "packages" : {
+                "apt" : {
+                  "glance"                   : [],
+                  "glance-api"               : [],
+                  "python-glanceclient"            : [],
+                  "glance-common"            : [],
+                  "python-mysqldb"           : []
+                }
+              },
+              "files" : {
+                "/opt/osonaws/setup_glance" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -v\n",
+                    "rm /var/lib/glance/glance.sqlite\n",
+                    "sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mysql/my.cnf\n",
+
+                    "sed -i \"s/sqlite:\\/\\/\\/\\/var\\/lib\\/glance\\/glance.sqlite\/mysql:\\/\\/glance:", { "Ref" : "GlanceMysqlUserPassword" }, "@0.0.0.0\\/glance\/g\" /etc/glance/glance-registry.conf\n",
+                    "sed -i 's/auth_host = 127.0.0.1/auth_host =", { "Ref" : "KeystoneIPAddress" }, "/g' /etc/glance/glance-registry.conf\n",
+                    "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/glance/glance-registry.conf\n",
+                    "sed -i 's/%SERVICE_USER%/glance/g' /etc/glance/glance-registry.conf\n",
+                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "KeystoneGlanceUserPassword" }, "/g' /etc/glance/glance-registry.conf\n",
+
+                    "sed -i \"s/sqlite:\\/\\/\\/\\/var\\/lib\\/glance\\/glance.sqlite\/mysql:\\/\\/glance:", { "Ref" : "GlanceMysqlUserPassword" }, "@0.0.0.0\\/glance\/g\" /etc/glance/glance-api.conf\n",
+                    "sed -i 's/auth_host = 127.0.0.1/auth_host =", { "Ref" : "KeystoneIPAddress" }, "/g' /etc/glance/glance-api.conf\n",
+                    "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/glance/glance-api.conf\n",
+                    "sed -i 's/%SERVICE_USER%/glance/g' /etc/glance/glance-api.conf\n",
+                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "KeystoneGlanceUserPassword" }, "/g' /etc/glance/glance-api.conf\n",
+                    
+                    "service mysql restart\n",
+                    "service glance-api restart && service glance-registry restart\n",
+                    "glance-manage db_sync\n"
+                  ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                }
+              },
+              "commands" : {
+                "01_setup_glance" : {
+                  "command" : "/opt/osonaws/setup_glance"
+                }
+              }
+            }
+          }
+        },
+        "Properties" : {
+          "KeyName" : { "Ref" : "KeyName" },
+          "InstanceType": { "Ref": "InstanceType" },
+          "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, "64" ] },
+          "SecurityGroups" : [ {"Ref" : "SwiftClusterSecurityGroup"} ],
+          "Monitoring" : "false",
+          "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
+            "#! /bin/bash\n",
+            "# -- Update\n",
+            "apt-get install ubuntu-cloud-keyring\n",
+            "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
+            "echo 'APT::Get::AllowUnauthenticated \"true\";' >> /etc/apt/apt.conf.d/70debconf\n",
+            "apt-get update && apt-get upgrade -y --force-yes\n",
+            "apt-get -y install python-setuptools\n",
+            "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",    
+            "function error_exit\n",
+            "{\n",
+            "  cfn-signal -e 1 -r \"$1\" '", { "Ref" : "GlanceWaitHandle" }, "'\n",
+            "  exit 1\n",
+            "}\n",
+            "cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r GlanceServer ",
+            "    --access-key ",  { "Ref" : "OpenStackUserAccessKey" },
+            "    --secret-key ", {"Fn::GetAtt": ["OpenStackUserAccessKey", "SecretAccessKey"]},
+            "    --region ", { "Ref" : "AWS::Region" }, 
+            "    --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
+            "# All is well so signal success\n",
+            "cfn-signal -e 0 -r \"Glance setup complete\" '", { "Ref" : "GlanceWaitHandle" }, "'\n"
+          ]]}
+        }
+      }
+    }
   },
   
   "Outputs" : {
-    "SwiftCommand" : {
+    "SwiftEndPoint" : {
       "Value" : { "Fn::Join" : ["", ["swift -V 2.0 -A http://", { "Ref" : "KeystoneIPAddress" }, ":5000/v2.0 -U service:swift -K ", { "Ref" : "KeystoneSwiftUserPassword" }, " stat" ]] },
       "Description" : "Command to execute to test the cluster with swift client."    
     }
