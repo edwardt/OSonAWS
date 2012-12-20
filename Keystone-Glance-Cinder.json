@@ -125,25 +125,71 @@
       "MaxLength": "64",
       "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
       "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
-    }
+    },
+
+    "CinderMysqlRootPassword": {
+      "Default": "WSORa6xTu2",
+      "Description" : "Cinder's MySQL root password",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "64",
+      "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
+      "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
+    },
+    
+    "CinderMysqlUserPassword": {
+      "Default": "IWur6lc2CQ",
+      "Description" : "Cinder's MySQL user password",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "64",
+      "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
+      "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
+    },
+      
+    "KeystoneCinderUserPassword": {
+      "Default": "icXyuCaywR",
+      "Description" : "Keystone Cinder user password",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "64",
+      "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
+      "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
+    },
+        
+    "CinderVolumeSize": {
+      "Default": "10",
+      "Description" : "Size of cinder volume",
+      "Type": "String"
+    }    
   },
 
   "Mappings" : {
 
-    "AWSRegionArch2AMI" : {
-      "us-east-1"      : { "64" : "ami-3d4ff254" },
-      "us-west-1"      : { "64" : "ami-0d153248" },
-      "us-west-2"      : { "64" : "ami-8e109ebe" },
-      "eu-west-1"      : { "64" : "ami-c1aaabb5" },
-      "sa-east-1"      : { "64" : "ami-c819c0d5" },
-      "ap-southeast-1" : { "64" : "ami-acf6b0fe" },
-      "ap-northeast-1" : { "64" : "ami-22ad1223" },
-      "ap-southeast-2" : { "64" : "ami-fb8611c1" }
-    }
+    "AWSRegionMap" : {
+        "us-east-1"      : { "AMI" : "ami-3d4ff254", "AZ" : "us-east-1a" },
+        "us-west-1"      : { "AMI" : "ami-0d153248", "AZ" : "us-west-1a" },
+        "us-west-2"      : { "AMI" : "ami-8e109ebe", "AZ" : "us-west-2a" },
+        "eu-west-1"      : { "AMI" : "ami-c1aaabb5", "AZ" : "eu-west-1a" },
+        "sa-east-1"      : { "AMI" : "ami-c819c0d5", "AZ" : "sa-east-1a" },
+        "ap-southeast-1" : { "AMI" : "ami-acf6b0fe", "AZ" : "ap-southeast-1a" },
+        "ap-northeast-1" : { "AMI" : "ami-22ad1223", "AZ" : "ap-northeast-1a" },
+        "ap-southeast-2" : { "AMI" : "ami-fb8611c1", "AZ" : "ap-southeast-2a" }
+      }
   },
 
   "Resources" : {
 
+	  
+	    "SwiftProxyIPAddress" : {
+	        "Type" : "AWS::EC2::EIP"
+	      },
+	  
+	  
+	  
+	  
+	  
+	  
   "OpenStackUser" : {
     "Type" : "AWS::IAM::User",
       "Properties" : {
@@ -182,7 +228,7 @@
       }
     },    
     
-    "SwiftClusterSecurityGroup" : {
+    "OpenStackSecurityGroup" : {
       "Type" : "AWS::EC2::SecurityGroup",
       "Properties" : {
         "GroupDescription" : "Need to reconfigure this security group.",
@@ -338,7 +384,13 @@
                       "GLANCE_USER=$(get_id keystone user-create --name=glance --pass=\"", { "Ref" : "KeystoneGlanceUserPassword" }, "\" --tenant-id $SERVICE_TENANT --email=glance@domain.com)\n",
                       "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $GLANCE_USER --role-id $ADMIN_ROLE\n",
                       "GLANCE_SERVICE=$(get_id keystone service-create --name=glance --type image --description 'OpenStack Image Service')\n",
-                      "keystone endpoint-create --region RegionOne --service-id $GLANCE_SERVICE --publicurl \"http:\/\/", { "Ref" : "GlanceIPAddress" }, ":9292/v2\" --adminurl \"http:\/\/", { "Ref" : "GlanceIPAddress" }, ":9292/v2\" --internalurl \"http:\/\/", { "Ref" : "GlanceIPAddress" }, ":9292/v2\"\n"
+                      "keystone endpoint-create --region RegionOne --service-id $GLANCE_SERVICE --publicurl \"http:\/\/", { "Ref" : "GlanceIPAddress" }, ":9292/v2\" --adminurl \"http:\/\/", { "Ref" : "GlanceIPAddress" }, ":9292/v2\" --internalurl \"http:\/\/", { "Ref" : "GlanceIPAddress" }, ":9292/v2\"\n",
+
+                      "#Cinder user and endpoint\n",
+                      "CINDER_USER=$(get_id keystone user-create --name=cinder --pass=\"", { "Ref" : "KeystoneCinderUserPassword" }, "\" --tenant-id $SERVICE_TENANT --email=cinder@domain.com)\n",
+                      "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $CINDER_USER --role-id $ADMIN_ROLE\n",
+                      "CINDER_SERVICE=$(get_id keystone service-create --name=cinder --type volume --description 'OpenStack Volume Service')\n",
+                      "keystone endpoint-create --region RegionOne --service-id $CINDER_SERVICE --publicurl \"http:\/\/", { "Ref" : "CinderIPAddress" }, ":8776\/v1\/%(tenant_id)s\" --adminurl \"http:\/\/", { "Ref" : "CinderIPAddress" }, ":8776\/v1\/%(tenant_id)s\" --internalurl \"http:\/\/", { "Ref" : "CinderIPAddress" }, ":8776\/v1\/%(tenant_id)s\"\n"
 
                     ]]},
                     "mode"  : "000700",
@@ -360,8 +412,8 @@
           "Properties" : {
             "KeyName" : { "Ref" : "KeyName" },
             "InstanceType": { "Ref": "InstanceType" },
-            "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, "64" ] },
-            "SecurityGroups" : [ {"Ref" : "SwiftClusterSecurityGroup"} ],
+            "ImageId" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AMI" ] },
+            "SecurityGroups" : [ {"Ref" : "OpenStackSecurityGroup"} ],
             "Monitoring" : "false",
             "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
                "#! /bin/bash\n",
@@ -369,7 +421,7 @@
                "apt-get install ubuntu-cloud-keyring\n",
                "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
                "echo 'APT::Get::AllowUnauthenticated \"true\";' >> /etc/apt/apt.conf.d/70debconf\n",
-               "apt-get update && apt-get upgrade -y --force-yes\n",
+               "apt-get update\n",
                "apt-get -y install python-setuptools\n",
                "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",    
                "function error_exit\n",
@@ -388,416 +440,7 @@
         }
       }
     },
-    
-    "SwiftNodeWaitHandle" : {
-      "Type" : "AWS::CloudFormation::WaitConditionHandle"
-    },
-    
-    "SwiftNodeWaitCondition" : {
-      "Type" : "AWS::CloudFormation::WaitCondition",
-      "DependsOn" : "SwiftNodesGroup",
-      "Properties" : {
-        "Handle" : {"Ref" : "SwiftNodeWaitHandle"},
-        "Timeout" : "1200"
-      }
-    },        
-    
-    "SwiftNodesGroup" : {
-      "Type" : "AWS::AutoScaling::AutoScalingGroup",
-      "Properties" : {
-        "AvailabilityZones" : { "Fn::GetAZs" : "" },
-        "LaunchConfigurationName" : { "Ref" : "SwiftNodeServer" },
-        "MinSize" : "3",
-        "MaxSize" : "10",
-        "DesiredCapacity" : { "Ref" : "SwiftNodeNumber" }
-      }
-    },
-    
-    "SwiftNodeServer": {
-      "Type": "AWS::AutoScaling::LaunchConfiguration",
-        "Metadata" : {
-          "AWS::CloudFormation::Init" : {
-            "configSets" : {
-              "fullinstall" : [ "setup_swiftnode" ]
-            },
-            "setup_swiftnode" : {
-              "packages" : {
-                "apt" : {
-                  "swift"            : [],
-                  "openssh-server"   : [],
-                  "python-xattr"     : [],
-                  "python-memcache"  : [],
-                  "swift-account"    : [],
-                  "swift-container"  : [],
-                  "swift-object"     : [],
-                  "xfsprogs"         : []
-                }
-              },
-              "files" : {
-                "/opt/osonaws/setup_swiftnode" : {
-                  "content" : { "Fn::Join" : ["", [
-                    "#!/bin/bash -v\n",
-                    "wget ", { "Ref" : "SSHpublicKeyURL" }, "\n",
-                    "cat ./id_dsa.pub >> /home/ubuntu/.ssh/authorized_keys\n",
-                    "mkdir -p /etc/swift\n",
-                    "chown -R swift:swift /etc/swift/\n",
-                    "cat << EOF > /etc/swift/swift.conf\n",
-                    "[swift-hash]\n",
-                    "swift_hash_path_suffix = ", { "Ref" : "SwiftHashPathPrefix" }, " \n",
-                    "EOF\n",
-                    "mkfs.xfs -i size=1024 /dev/xvdb\n",
-                    "echo '/dev/xvdb /srv/node/xvdb xfs noatime,nodiratime,nobarrier,logbufs=8 0 0' >> /etc/fstab\n",
-                    "mkdir -p /srv/node/xvdb\n",
-                    "mount /srv/node/xvdb\n",
-                    "chown -R swift:swift /srv/node\n",
-                    "cat << EOF > /etc/rsyncd.conf\n",
-                    "uid = swift\n",
-                    "gid = swift\n",
-                    "log file = /var/log/rsyncd.log\n",
-                    "pid file = /var/run/rsyncd.pid\n",
-                    "address = 0.0.0.0\n",
-                    "[account]\n",
-                    "max connections = 2\n",
-                    "path = /srv/node/\n",
-                    "read only = false\n",
-                    "lock file = /var/lock/account.lock\n",
-                    "[container]\n",
-                    "max connections = 2\n",
-                    "path = /srv/node/\n",
-                    "read only = false\n",
-                    "lock file = /var/lock/container.lock\n",
-                    "[object]\n",
-                    "max connections = 2\n",
-                    "path = /srv/node/\n",
-                    "read only = false\n",
-                    "lock file = /var/lock/object.lock\n",
-                    "EOF\n",
-                    "sed -i 's/RSYNC_ENABLE=false/RSYNC_ENABLE=true/g' /etc/default/rsync\n",
-                    "service rsync start\n",
-                    "cat << EOF > /etc/swift/account-server.conf\n",
-                    "[DEFAULT]\n",
-                    "bind_ip = 0.0.0.0\n",
-                    "workers = 2\n",
-                    "\n",
-                    "[pipeline:main]\n",
-                    "pipeline = account-server\n",
-                    "\n",
-                    "[app:account-server]\n",
-                    "use = egg:swift#account\n",
-                    "\n",
-                    "[account-replicator]\n",
-                    "\n",
-                    "[account-auditor]\n",
-                    "\n",
-                    "[account-reaper]\n",
-                    "\n",
-                    "EOF\n",
-                    "cat << EOF > /etc/swift/container-server.conf\n",
-                    "[DEFAULT]\n",
-                    "bind_ip = 0.0.0.0\n",
-                    "workers = 2\n",
-                    "\n",
-                    "[pipeline:main]\n",
-                    "pipeline = container-server\n",
-                    "\n",
-                    "[app:container-server]\n",
-                    "use = egg:swift#container\n",
-                    "\n",
-                    "[container-replicator]\n",
-                    "\n",
-                    "[container-updater]\n",
-                    "\n",
-                    "[container-auditor]\n",
-                    "\n",
-                    "[container-sync]\n",
-                    "\n",
-                    "EOF\n",
-                    "cat << EOF > /etc/swift/object-server.conf\n",
-                    "[DEFAULT]\n",
-                    "bind_ip = 0.0.0.0\n",
-                    "workers = 2\n",
-                    "\n",
-                    "[pipeline:main]\n",
-                    "pipeline = object-server\n",
-                    "\n",
-                    "[app:object-server]\n",
-                    "use = egg:swift#object\n",
-                    "\n",
-                    "[object-replicator]\n",
-                    "\n",
-                    "[object-updater]\n",
-                    "\n",
-                    "[object-auditor]\n",
-                    "\n",
-                    "[object-expirer]\n",
-                    "EOF\n",
-                    "swift-init object-server start\n",
-                    "swift-init object-replicator start\n",
-                    "swift-init object-updater start\n", 
-                    "swift-init object-auditor start\n",
-                    "swift-init container-server start\n",
-                    "swift-init container-replicator start\n",
-                    "swift-init container-updater start\n",
-                    "swift-init container-auditor start\n",
-                    "swift-init account-server start\n",
-                    "swift-init account-replicator start\n",
-                    "swift-init account-auditor start\n"
-                  ]]},
-                  "mode"  : "000700",
-                  "owner" : "ubuntu",
-                  "group" : "ubuntu"
-                }
-              },
-              "commands" : {
-                "01_seed" : {
-                  "command" : "/opt/osonaws/setup_swiftnode"
-              }
-            }
-          }
-        }
-      },
-      "Properties" : {
-        "KeyName" : { "Ref" : "KeyName" },
-        "InstanceType": { "Ref": "InstanceType" },
-        "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, "64" ] },
-        "SecurityGroups" : [ {"Ref" : "SwiftClusterSecurityGroup"} ],
-        "BlockDeviceMappings" : [{"DeviceName" : "/dev/sdb", "Ebs": { "VolumeSize": { "Ref" : "SwiftNodeDiskSize" }}}],
-        "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
-          "#! /bin/bash\n",
-          "# -- Update\n",
-          "apt-get update\n",
-          "apt-get -y install python-setuptools\n",
-          "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",    
-          "function error_exit\n",
-          "{\n",
-          "  cfn-signal -e 1 -r \"$1\" '", { "Ref" : "SwiftNodeWaitHandle" }, "'\n",
-          "  exit 1\n",
-          "}\n",
-          "cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r SwiftNodeServer ",
-          "    --access-key ",  { "Ref" : "OpenStackUserAccessKey" },
-          "    --secret-key ", {"Fn::GetAtt": ["OpenStackUserAccessKey", "SecretAccessKey"]},
-          "    --region ", { "Ref" : "AWS::Region" }, 
-          "    --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
-          "# All is well so signal success\n",
-          "cfn-signal -e 0 -r \"SwiftNode setup complete\" '", { "Ref" : "SwiftNodeWaitHandle" }, "'\n"
-          ]]}
-        }
-      }    
-    },
 
-    "SwiftProxyWaitHandle" : {
-      "Type" : "AWS::CloudFormation::WaitConditionHandle"
-    },
-    
-    "SwiftProxyWaitCondition" : {
-      "Type" : "AWS::CloudFormation::WaitCondition",
-      "DependsOn" : "SwiftProxyServer",
-      "Properties" : {
-        "Handle" : {"Ref" : "SwiftProxyWaitHandle"},
-        "Timeout" : "1200"
-      }
-    },      
-
-    "SwiftProxyIPAddress" : {
-      "Type" : "AWS::EC2::EIP"
-    },
-
-    "SwiftProxyIPAssoc" : {
-      "Type" : "AWS::EC2::EIPAssociation",
-      "Properties" : {
-        "InstanceId" : { "Ref" : "SwiftProxyServer" },
-        "EIP" : { "Ref" : "SwiftProxyIPAddress" }
-      }
-    },
-    
-    "SwiftProxyServer": {
-      "Type": "AWS::EC2::Instance",
-        "Metadata" : {
-          "AWS::CloudFormation::Init" : {
-            "configSets" : {
-              "fullinstall" : [ "setup_swiftproxy", "create_ring" ]
-            },
-            
-            "create_ring" : {
-              "packages" : {
-                "apt" : {
-                  "default-jre"        : [],
-                  "unzip"              : []
-                }
-              },
-              "sources" : {
-                "/opt"            : "http://s3.amazonaws.com/ec2-downloads/ec2-api-tools.zip"
-              },
-              "files" : {
-                "/opt/osonaws/create_ring" : {
-                  "content" : { "Fn::Join" : ["", [
-                    "#! /bin/bash\n",
-                    "mv /opt/ec2-api-tools-* /opt/ec2-api-tools\n",
-                    "export EC2_HOME=/opt/ec2-api-tools\n",
-                    "export JAVA_HOME=/usr\n",
-                    "export AWS_ACCESS_KEY=", {"Ref" : "OpenStackUserAccessKey"} , "\n",
-                    "export AWS_SECRET_KEY=",  {"Fn::GetAtt" : ["OpenStackUserAccessKey", "SecretAccessKey"]}, "\n",
-                    "export PATH=$PATH:$EC2_HOME/bin\n",
-                    "chmod +x $EC2_HOME/bin/*\n",
-                        
-                    "SWIFT_NODES_IP=$(ec2-describe-instances --region ", { "Ref" : "AWS::Region" } ," | grep ", {"Ref" : "SwiftNodesGroup"} , " | cut -f 3)\n",
-                    "ZONE=\"1\"\n",
-                        
-                    "cd /etc/swift\n",
-                    "swift-ring-builder account.builder create 18 ", { "Ref" : "SwiftNodeNumber" } ," 1\n",
-                    "swift-ring-builder container.builder create 18 ", { "Ref" : "SwiftNodeNumber" } ," 1\n",
-                    "swift-ring-builder object.builder create 18 ", { "Ref" : "SwiftNodeNumber" } ," 1\n",
-                    
-                    "wget ", { "Ref" : "SSHprivateKeyURL" }, "\n",
-                    "mv /etc/swift/id_dsa /home/ubuntu/.ssh/\n",
-                    
-                    "for instance in $SWIFT_NODES_IP\n",
-                    "do\n",
-                    "NODE_IP=$(ec2-describe-instances --region ", { "Ref" : "AWS::Region" } ," | grep $instance | grep INSTANCE | cut -f 18)\n",
-                    "swift-ring-builder account.builder add z${ZONE}-${NODE_IP}:6002/xvdb 100\n",
-                    "swift-ring-builder container.builder add z${ZONE}-${NODE_IP}:6001/xvdb 100\n",
-                    "swift-ring-builder object.builder add z${ZONE}-${NODE_IP}:6000/xvdb 100\n",
-                    "ZONE=$(($ZONE+1))\n",
-                    "done\n",
-
-                    "swift-ring-builder account.builder rebalance\n",
-                    "swift-ring-builder container.builder rebalance\n",
-                    "swift-ring-builder object.builder rebalance\n",
-                    "swift-init proxy start\n",
-
-                    "for instance in $SWIFT_NODES_IP\n",
-                    "do\n",                   
-                    "NODE_IP=$(ec2-describe-instances --region ", { "Ref" : "AWS::Region" } ," | grep $instance | grep INSTANCE | cut -f 18)\n",
-                    "su ubuntu -c \"scp -oStrictHostKeyChecking=no /etc/swift/*.gz ubuntu@$NODE_IP:/home/ubuntu\"\n",
-                    "su ubuntu -c \"ssh -oStrictHostKeyChecking=no ubuntu@$NODE_IP 'sudo mv /home/ubuntu/*.gz /etc/swift && sudo chown -R swift:swift /etc/swift'\"\n",
-                    "su ubuntu -c \"ssh -oStrictHostKeyChecking=no ubuntu@$NODE_IP 'sudo swift-init main start; sudo swift-init rest start'\"\n",
-                    "done\n",
-      
-                    "exit 0\n"
-                  ]]},
-                  "mode"  : "000700",
-                  "owner" : "ubuntu",
-                  "group" : "ubuntu"
-                }
-              },
-              "commands" : {
-                "01_create_ring" : {
-                  "command" : "/opt/osonaws/create_ring"
-                }
-              }
-            },
-            
-            "setup_swiftproxy" : {
-              "packages" : {
-                "apt" : {
-                  "swift"               : [],
-                  "openssh-server"      : [],
-                  "python-keystone"     : [],
-                  "python-xattr"        : [],
-                  "python-memcache"     : [],
-                  "swift-proxy"         : [],
-                  "memcached"           : []
-                }
-              },
-              "files" : {
-                "/opt/osonaws/setup_swiftproxy" : {
-                  "content" : { "Fn::Join" : ["", [
-                    "#!/bin/bash -v\n",
-                                
-                    "mkdir -p /etc/swift\n",
-                    "chown -R swift:swift /etc/swift/\n",
-                    "cat << EOF > /etc/swift/swift.conf\n",
-                    "[swift-hash]\n",
-                    "swift_hash_path_suffix = ", { "Ref" : "SwiftHashPathPrefix" }, "\n",
-                    "EOF\n",
-                                
-                    "cd /etc/swift\n",
-                    "#openssl req -new -x509 -nodes -out cert.crt -keyout cert.key\n",                                
-                    "cat << EOF > /etc/swift/proxy-server.conf\n",
-                    "[DEFAULT]\n",
-                    "bind_port = 8080\n",
-                    "user = swift\n",
-                    "[pipeline:main]\n",
-                    "pipeline = healthcheck cache swift3 authtoken keystone proxy-server\n",
-                    "[app:proxy-server]\n",
-                    "use = egg:swift#proxy\n",
-                    "allow_account_management = true\n",
-                    "account_autocreate = true\n",
-                    "[filter:keystone]\n",
-                    "paste.filter_factory = keystone.middleware.swift_auth:filter_factory\n",
-                    "operator_roles = Member,admin, swiftoperator\n",
-                    "[filter:authtoken]\n",
-                    "paste.filter_factory = keystone.middleware.auth_token:filter_factory\n",
-                    "# Delaying the auth decision is required to support token-less\n",
-                    "# usage for anonymous referrers ('.r:*').\n",
-                    "delay_auth_decision = 10\n",
-                    "service_port = 5000\n",
-                    "service_host = ", { "Ref" : "KeystoneIPAddress" }, "\n",
-                    "auth_port = 35357\n",
-                    "auth_host = ", { "Ref" : "KeystoneIPAddress" }, "\n",
-                    "auth_protocol = http\n",
-                    "auth_uri = http://", { "Ref" : "KeystoneIPAddress" }, ":5000/\n",
-                    "auth_token = ", { "Ref" : "KeystoneAdminToken" }, "\n",
-                    "admin_token = ", { "Ref" : "KeystoneAdminToken" }, "\n",
-                    "admin_tenant_name = service\n",
-                    "admin_user = swift\n",
-                    "admin_password = ", { "Ref" : "KeystoneSwiftUserPassword" }, "\n",
-                    "[filter:cache]\n",
-                    "use = egg:swift#memcache\n",
-                    "set log_name = cache\n",
-                    "[filter:catch_errors]\n",
-                    "use = egg:swift#catch_errors\n",
-                    "[filter:healthcheck]\n",
-                    "use = egg:swift#healthcheck\n",
-                    "[filter:swift3]\n",
-                    "use = egg:swift#swift3\n",
-                    "EOF\n"
-                    
-                    ]]},
-                  "mode"  : "000700",
-                  "owner" : "ubuntu",
-                  "group" : "ubuntu"
-                }
-              },
-              "commands" : {
-                "01_setup_swiftproxy" : {
-                  "command" : "/opt/osonaws/setup_swiftproxy"
-                }
-              }
-            }
-          }
-        },
-        "Properties" : {
-          "KeyName" : { "Ref" : "KeyName" },
-          "InstanceType": { "Ref": "InstanceType" },
-          "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, "64" ] },
-          "SecurityGroups" : [ {"Ref" : "SwiftClusterSecurityGroup"} ],
-          "Monitoring" : "false",
-          "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
-          "#! /bin/bash\n",
-
-          "# -- Update\n",
-          "apt-get update\n",
-          "apt-get -y install python-setuptools\n",
-          "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",
-                    
-          "function error_exit\n",
-          "{\n",
-          "  cfn-signal -e 1 -r \"$1\" '", { "Ref" : "SwiftProxyWaitHandle" }, "'\n",
-          "  exit 1\n",
-          "}\n",
-          "cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r SwiftProxyServer ",
-          "    --access-key ",  { "Ref" : "OpenStackUserAccessKey" },
-          "    --secret-key ", {"Fn::GetAtt": ["OpenStackUserAccessKey", "SecretAccessKey"]},
-          "    --region ", { "Ref" : "AWS::Region" }, 
-          "    --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
-          "# All is well so signal success\n",
-          "cfn-signal -e 0 -r \"SwiftProxy setup complete\" '", { "Ref" : "SwiftProxyWaitHandle" }, "'\n"
-          ]]}
-        }
-      }
-    },
-    
     "GlanceWaitHandle" : {
       "Type" : "AWS::CloudFormation::WaitConditionHandle"
     },
@@ -896,7 +539,7 @@
                 "apt" : {
                   "glance"                   : [],
                   "glance-api"               : [],
-                  "python-glanceclient"            : [],
+                  "python-glanceclient"      : [],
                   "glance-common"            : [],
                   "python-mysqldb"           : []
                 }
@@ -940,8 +583,8 @@
         "Properties" : {
           "KeyName" : { "Ref" : "KeyName" },
           "InstanceType": { "Ref": "InstanceType" },
-          "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, "64" ] },
-          "SecurityGroups" : [ {"Ref" : "SwiftClusterSecurityGroup"} ],
+          "ImageId" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AMI" ] },
+          "SecurityGroups" : [ {"Ref" : "OpenStackSecurityGroup"} ],
           "Monitoring" : "false",
           "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
             "#! /bin/bash\n",
@@ -949,7 +592,7 @@
             "apt-get install ubuntu-cloud-keyring\n",
             "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
             "echo 'APT::Get::AllowUnauthenticated \"true\";' >> /etc/apt/apt.conf.d/70debconf\n",
-            "apt-get update && apt-get upgrade -y --force-yes\n",
+            "apt-get update\n",
             "apt-get -y install python-setuptools\n",
             "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",    
             "function error_exit\n",
@@ -967,9 +610,199 @@
           ]]}
         }
       }
+    },
+
+    "CinderWaitHandle" : {
+      "Type" : "AWS::CloudFormation::WaitConditionHandle"
+    },
+    
+    "CinderWaitCondition" : {
+      "Type" : "AWS::CloudFormation::WaitCondition",
+      "DependsOn" : "CinderServer",
+      "Properties" : {
+        "Handle" : {"Ref" : "CinderWaitHandle"},
+        "Timeout" : "1200"
+      }
+    },      
+
+    "CinderIPAddress" : {
+      "Type" : "AWS::EC2::EIP"
+    },
+
+    "CinderIPAssoc" : {
+      "Type" : "AWS::EC2::EIPAssociation",
+      "Properties" : {
+        "InstanceId" : { "Ref" : "CinderServer" },
+        "EIP" : { "Ref" : "CinderIPAddress" }
+      }
+    },
+      
+    "CinderServer": {
+      "Type": "AWS::EC2::Instance",
+        "Metadata" : {
+          "AWS::CloudFormation::Init" : {
+            "configSets" : {
+              "fullinstall" : [ "setup_seed", "setup_database", "setup_cinder" ]
+             },
+            "setup_seed" : {
+              "files" : {
+                "/opt/osonaws/tmp/all.preseed" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "mysql-server mysql-server/root_password password ", { "Ref" : "CinderMysqlRootPassword" }, "\n",
+                    "mysql-server mysql-server/root_password_again password ", { "Ref" : "CinderMysqlRootPassword" }, "\n",
+                    "mysql-server mysql-server/start_on_boot boolean true\n"
+                  ]]},
+                  "mode"  : "000600",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                },
+                "/opt/osonaws/tmp/setup_seed" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -v\n",
+                    "debconf-set-selections < /opt/osonaws/tmp/all.preseed\n"
+                  ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                }
+              },
+              "commands" : {
+                "01_seed" : {
+                  "command" : "/opt/osonaws/tmp/setup_seed"
+                }
+              }
+            },
+            "setup_database" : {
+              "packages" : {
+                "apt" : {
+                  "mysql-server"            : []
+                }
+              },
+              "files" : {
+                "/opt/osonaws/setup.mysql" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "CREATE DATABASE cinder;\n",
+                    "GRANT ALL ON cinder.* TO 'cinder'@'%' IDENTIFIED BY '", { "Ref" : "CinderMysqlUserPassword" }, "';\n",
+                    "GRANT ALL ON cinder.* TO 'cinder'@'localhost' IDENTIFIED BY '", { "Ref" : "CinderMysqlUserPassword" }, "';\n"
+                  ]]},
+                  "mode"  : "000600",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                },
+                "/opt/osonaws/setup_database" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -v\n",
+                    "mysql -u root --password='", { "Ref" : "CinderMysqlRootPassword" }, "' < /opt/osonaws/setup.mysql\n"
+                  ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                }
+              },
+              "commands" : {
+                "01_setup_database" : {
+                "command" : "/opt/osonaws/setup_database"
+                }
+              }
+            },
+            "setup_cinder" : {
+              "packages" : {
+                "apt" : {
+                  "cinder-api"            : [],
+                  "cinder-scheduler"      : [],
+                  "cinder-volume"         : [],
+                  "iscsitarget"           : [],
+                  "open-iscsi"            : [],
+                  "iscsitarget-dkms"      : [],
+                  "python-cinderclient"   : [],
+                  "python-mysqldb"        : [],
+                  "rabbitmq-server"       : []
+                }
+              },
+              "files" : {
+                "/opt/osonaws/setup_cinder" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -v\n",
+                    "rabbitmqctl change_password guest password\n",
+                    "sed -i 's/\\*.conf/cinder_tgt.conf/g' /etc/tgt/targets.conf\n",
+                    "echo \"sql_connection = mysql://cinder:", { "Ref" : "CinderMysqlUserPassword" }, "@0.0.0.0:3306/cinder\n",
+                    "rabbit_password = password\" >> /etc/cinder/cinder.conf\n",
+                    
+                    "apt-get install linux-headers-`uname -r` -y\n",
+                    "sed -i 's/false/true/g' /etc/default/iscsitarget\n",
+                    "service iscsitarget start\n",
+                    "service open-iscsi start\n",
+                      
+                    "pvcreate /dev/xvdh\n",
+                    "vgcreate cinder-volumes /dev/xvdh\n",
+                    
+                    "sed -i 's/auth_host = 127.0.0.1/auth_host =", { "Ref" : "KeystoneIPAddress" }, "/g' /etc/cinder/api-paste.ini\n",
+                    "sed -i 's/service_host = 127.0.0.1/service_host =", { "Ref" : "KeystoneIPAddress" }, "/g' /etc/cinder/api-paste.ini\n",
+                    "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/cinder/api-paste.ini\n",
+                    "sed -i 's/%SERVICE_USER%/cinder/g' /etc/cinder/api-paste.ini\n",
+                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "KeystoneCinderUserPassword" }, "/g' /etc/cinder/api-paste.ini\n",    
+                     
+                    "cinder-manage db sync\n",
+                    "service cinder-api restart\n",
+                    "service cinder-scheduler restart\n",
+                    "service cinder-volume restart\n"
+                     
+                  ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                }
+              },
+              "commands" : {
+                "01_setup_glance" : {
+                  "command" : "/opt/osonaws/setup_cinder"
+                }
+              }
+            }
+          }
+        },
+        "Properties" : {
+          "KeyName" : { "Ref" : "KeyName" },
+          "InstanceType": { "Ref": "InstanceType" },
+          "ImageId" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AMI" ] },
+          "Volumes" : [{ "VolumeId" : { "Ref" : "CinderVolume" }, "Device" : "/dev/sdh" }],
+          "SecurityGroups" : [ {"Ref" : "OpenStackSecurityGroup"} ],
+          "Monitoring" : "false",
+          "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
+            "#! /bin/bash\n",
+            "# -- Update\n",
+            "apt-get install ubuntu-cloud-keyring\n",
+            "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
+            "echo 'APT::Get::AllowUnauthenticated \"true\";' >> /etc/apt/apt.conf.d/70debconf\n",
+            "apt-get update && apt-get upgrade -y --force-yes\n",
+            "apt-get -y install python-setuptools\n",
+            "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",    
+            "function error_exit\n",
+            "{\n",
+            "  cfn-signal -e 1 -r \"$1\" '", { "Ref" : "CinderWaitHandle" }, "'\n",
+            "  exit 1\n",
+            "}\n",
+            "cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r CinderServer ",
+            "    --access-key ",  { "Ref" : "OpenStackUserAccessKey" },
+            "    --secret-key ", {"Fn::GetAtt": ["OpenStackUserAccessKey", "SecretAccessKey"]},
+            "    --region ", { "Ref" : "AWS::Region" }, 
+            "    --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
+            "# All is well so signal success\n",
+            "cfn-signal -e 0 -r \"Cinder setup complete\" '", { "Ref" : "CinderWaitHandle" }, "'\n"
+          ]]}
+        }
+      }
+    },
+    
+    "CinderVolume" : {
+      "Type" : "AWS::EC2::Volume",
+        "Properties" : {
+          "Size" : {"Ref" : "CinderVolumeSize"},
+          "AvailabilityZone" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AZ" ] }
+        }
     }
   },
-  
+
   "Outputs" : {
     "SwiftEndPoint" : {
       "Value" : { "Fn::Join" : ["", ["swift -V 2.0 -A http://", { "Ref" : "KeystoneIPAddress" }, ":5000/v2.0 -U service:swift -K ", { "Ref" : "KeystoneSwiftUserPassword" }, " stat" ]] },
