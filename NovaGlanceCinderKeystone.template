@@ -161,7 +161,41 @@
       "Default": "10",
       "Description" : "Size of cinder volume",
       "Type": "String"
-    }    
+    },
+    
+    "NovaMysqlRootPassword": {
+        "Default": "WSORa6xTu2",
+        "Description" : "Nova's MySQL root password",
+        "Type": "String",
+        "MinLength": "1",
+        "MaxLength": "64",
+        "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
+        "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
+      },
+        
+      "NovaMysqlUserPassword": {
+        "Default": "IWur6lc2CQ",
+        "Description" : "Nova's MySQL user password",
+        "Type": "String",
+        "MinLength": "1",
+        "MaxLength": "64",
+        "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
+        "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
+      },
+        
+      "KeystoneNovaUserPassword": {
+        "Default": "icXyuCaywR",
+        "Description" : "Keystone Nova user password",
+        "Type": "String",
+        "MinLength": "1",
+        "MaxLength": "64",
+        "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
+        "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
+      }
+    
+    
+    
+    
   },
 
   "Mappings" : {
@@ -180,16 +214,6 @@
 
   "Resources" : {
 
-	  
-	    "SwiftProxyIPAddress" : {
-	        "Type" : "AWS::EC2::EIP"
-	      },
-	  
-	  
-	  
-	  
-	  
-	  
   "OpenStackUser" : {
     "Type" : "AWS::IAM::User",
       "Properties" : {
@@ -336,13 +360,16 @@
                   "apt" : {
                     "keystone"                 : [],
                     "python-mysqldb"           : [],
-                    "python-keystoneclient"    : []
+                    "python-keystoneclient"    : [],
+                    "rabbitmq-server"          : []
                   }
                 },
                 "files" : {
                   "/opt/osonaws/setup_keystone" : {
                     "content" : { "Fn::Join" : ["", [
                       "#!/bin/bash -v\n",
+                      
+                      "rabbitmqctl change_password guest password\n",
                       "rm /var/lib/keystone/keystone.db\n",
                       "sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mysql/my.cnf\n",
                       "sed -i \"s/sqlite:\\/\\/\\/\\/var\\/lib\\/keystone\\/keystone.db\/mysql:\\/\\/keystone:", { "Ref" : "KeystoneMysqlUserPassword" }, "@0.0.0.0\\/keystone\/g\" /etc/keystone/keystone.conf\n",
@@ -370,28 +397,64 @@
                       "SERVICE_HOST='127.0.0.1'\n",
                       "export SERVICE_TOKEN='", { "Ref" : "KeystoneAdminToken" }, "'\n",
                       "export SERVICE_ENDPOINT='http://0.0.0.0:35357/v2.0'\n",
+                      "ADMIN_PASSWORD=${ADMIN_PASSWORD:-password}\n",
+                      "SERVICE_PASSWORD=${SERVICE_PASSWORD:-$ADMIN_PASSWORD}\n",
                       
+                      "# Tenants\n",
+                      "ADMIN_TENANT=$(get_id keystone tenant-create --name=admin)\n",
                       "SERVICE_TENANT=$(get_id keystone tenant-create --name=\"$SERVICE_TENANT_NAME\")\n",
+                      "DEMO_TENANT=$(get_id keystone tenant-create --name=demo)\n",
+                      "INVIS_TENANT=$(get_id keystone tenant-create --name=invisible_to_admin)\n",
+                      
+                      "# Users\n",
+                      "ADMIN_USER=$(get_id keystone user-create --name=admin --pass=\"$ADMIN_PASSWORD\" --email=admin@domain.com)\n",
+                      "DEMO_USER=$(get_id keystone user-create --name=demo --pass=\"$ADMIN_PASSWORD\" --email=demo@domain.com)\n",
+
+                      "# Roles\n",
                       "ADMIN_ROLE=$(get_id keystone role-create --name=admin)\n",
+                      "KEYSTONEADMIN_ROLE=$(get_id keystone role-create --name=KeystoneAdmin)\n",
+                      "KEYSTONESERVICE_ROLE=$(get_id keystone role-create --name=KeystoneServiceAdmin)\n",
                       
-                      "#Swift user and endpoint\n",
-                      "SWIFT_USER=$(get_id keystone user-create --name=swift --pass=\"", { "Ref" : "KeystoneSwiftUserPassword" }, "\" --tenant-id $SERVICE_TENANT --email=swift@example.com)\n",
-                      "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $SWIFT_USER --role-id $ADMIN_ROLE\n",
-                      "SWIFT_SERVICE=$(get_id keystone service-create --name=swift --type=\"object-store\" --description=\"Swift Service\")\n",
-                      "keystone endpoint-create --region RegionOne --service-id $SWIFT_SERVICE --publicurl \"http:\/\/", { "Ref" : "SwiftProxyIPAddress" }, ":8080\/v1\/AUTH_%(tenant_id)s\" --adminurl \"http:\/\/", { "Ref" : "SwiftProxyIPAddress" }, ":8080\" --internalurl \"http:\/\/", { "Ref" : "SwiftProxyIPAddress" }, ":8080\/v1\/AUTH_%(tenant_id)s\"\n",
+                      "# Add Roles to Users in Tenants\n",
+                      "keystone user-role-add --user-id $ADMIN_USER --role-id $ADMIN_ROLE --tenant-id $ADMIN_TENANT\n",
+                      "keystone user-role-add --user-id $ADMIN_USER --role-id $ADMIN_ROLE --tenant-id $DEMO_TENANT\n",
+                      "keystone user-role-add --user-id $ADMIN_USER --role-id $KEYSTONEADMIN_ROLE --tenant-id $ADMIN_TENANT\n",
+                      "keystone user-role-add --user-id $ADMIN_USER --role-id $KEYSTONESERVICE_ROLE --tenant-id $ADMIN_TENANT\n",
                       
-                      "#Glance user and endpoint\n",
+                      "# The Member role is used by Horizon and Swift\n",
+                      "MEMBER_ROLE=$(get_id keystone role-create --name=Member)\n",
+                      "keystone user-role-add --user-id $DEMO_USER --role-id $MEMBER_ROLE --tenant-id $DEMO_TENANT\n",
+                      "keystone user-role-add --user-id $DEMO_USER --role-id $MEMBER_ROLE --tenant-id $INVIS_TENANT\n",
+                      
+                      "# Configure service users/roles\n",
+                      "NOVA_USER=$(get_id keystone user-create --name=nova --pass=\"", { "Ref" : "KeystoneNovaUserPassword" }, "\" --tenant-id $SERVICE_TENANT --email=nova@domain.com)\n",
+                      "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $NOVA_USER --role-id $ADMIN_ROLE\n",
                       "GLANCE_USER=$(get_id keystone user-create --name=glance --pass=\"", { "Ref" : "KeystoneGlanceUserPassword" }, "\" --tenant-id $SERVICE_TENANT --email=glance@domain.com)\n",
                       "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $GLANCE_USER --role-id $ADMIN_ROLE\n",
-                      "GLANCE_SERVICE=$(get_id keystone service-create --name=glance --type image --description 'OpenStack Image Service')\n",
-                      "keystone endpoint-create --region RegionOne --service-id $GLANCE_SERVICE --publicurl \"http:\/\/", { "Ref" : "GlanceIPAddress" }, ":9292/v2\" --adminurl \"http:\/\/", { "Ref" : "GlanceIPAddress" }, ":9292/v2\" --internalurl \"http:\/\/", { "Ref" : "GlanceIPAddress" }, ":9292/v2\"\n",
-
-                      "#Cinder user and endpoint\n",
+                      "SWIFT_USER=$(get_id keystone user-create --name=swift --pass=\"", { "Ref" : "KeystoneSwiftUserPassword" }, "\" --tenant-id $SERVICE_TENANT --email=swift@example.com)\n",
+                      "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $SWIFT_USER --role-id $ADMIN_ROLE\n",
+                      "RESELLER_ROLE=$(get_id keystone role-create --name=ResellerAdmin)\n",
+                      "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $NOVA_USER --role-id $RESELLER_ROLE\n",
+                      "QUANTUM_USER=$(get_id keystone user-create --name=quantum --pass=\"$SERVICE_PASSWORD\" --tenant-id $SERVICE_TENANT --email=quantum@domain.com)\n",
+                      "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $QUANTUM_USER --role-id $ADMIN_ROLE\n",
                       "CINDER_USER=$(get_id keystone user-create --name=cinder --pass=\"", { "Ref" : "KeystoneCinderUserPassword" }, "\" --tenant-id $SERVICE_TENANT --email=cinder@domain.com)\n",
                       "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $CINDER_USER --role-id $ADMIN_ROLE\n",
-                      "CINDER_SERVICE=$(get_id keystone service-create --name=cinder --type volume --description 'OpenStack Volume Service')\n",
-                      "keystone endpoint-create --region RegionOne --service-id $CINDER_SERVICE --publicurl \"http:\/\/", { "Ref" : "CinderIPAddress" }, ":8776\/v1\/%(tenant_id)s\" --adminurl \"http:\/\/", { "Ref" : "CinderIPAddress" }, ":8776\/v1\/%(tenant_id)s\" --internalurl \"http:\/\/", { "Ref" : "CinderIPAddress" }, ":8776\/v1\/%(tenant_id)s\"\n"
-
+                      
+                      "#Services creation\n",
+                      "NOVA_SERVICE=$(get_id keystone service-create --name nova --type compute --description 'OpenStack Compute Service')\n",
+                      "CINDER_SERVICE=$(get_id keystone service-create --name cinder --type volume --description 'OpenStack Volume Service')\n",
+                      "GLANCE_SERVICE=$(get_id keystone service-create --name glance --type image --description 'OpenStack Image Service')\n",
+                      "SWIFT_SERVICE=$(get_id keystone service-create --name swift --type object-store --description 'OpenStack Storage Service')\n",
+                      "KEYSTONE_SERVICE=$(get_id keystone service-create --name keystone --type identity --description 'OpenStack Identity')\n",
+                      "EC2_SERVICE=$(get_id keystone service-create --name ec2 --type ec2 --description 'OpenStack EC2 service')\n",
+                      "QUANTUM_SERVICE=$(get_id keystone service-create --name quantum --type network --description 'OpenStack Networking service')\n",
+                      
+                      "#Endpoint creation\n",
+                      "keystone endpoint-create --region RegionOne --service-id $GLANCE_SERVICE --publicurl 'http:\/\/", { "Ref" : "GlanceIPAddress" }, ":9292/v2' --adminurl 'http:\/\/", { "Ref" : "GlanceIPAddress" }, ":9292/v2' --internalurl 'http:\/\/", { "Ref" : "GlanceIPAddress" }, ":9292/v2'\n",
+                      "keystone endpoint-create --region RegionOne --service-id $CINDER_SERVICE --publicurl 'http:\/\/", { "Ref" : "CinderIPAddress" }, ":8776\/v1\/%(tenant_id)s' --adminurl 'http:\/\/", { "Ref" : "CinderIPAddress" }, ":8776\/v1\/%(tenant_id)s' --internalurl 'http:\/\/", { "Ref" : "CinderIPAddress" }, ":8776\/v1\/%(tenant_id)s'\n",                  
+                      "keystone endpoint-create --region RegionOne --service-id $KEYSTONE_SERVICE --publicurl 'http:\/\/", { "Ref" : "KeystoneIPAddress" }, ":5000/v2.0' --adminurl 'http:\/\/", { "Ref" : "KeystoneIPAddress" }, ":5000/v2.0' --internalurl 'http:\/\/", { "Ref" : "KeystoneIPAddress" }, ":5000/v2.0'\n",
+                      "keystone endpoint-create --region RegionOne --service-id $NOVA_SERVICE --publicurl 'http:\/\/", { "Ref" : "NovaIPAddress" }, ":8774/v2/%(tenant_id)s' --adminurl 'http:\/\/", { "Ref" : "NovaIPAddress" }, ":8774/v2/%(tenant_id)s' --internalurl 'http:\/\/", { "Ref" : "NovaIPAddress" }, ":8774/v2/%(tenant_id)s'\n",
+                      "keystone endpoint-create --region RegionOne --service-id $EC2_SERVICE --publicurl 'http:\/\/", { "Ref" : "NovaIPAddress" }, ":8773/services/Cloud' --adminurl 'http:\/\/", { "Ref" : "NovaIPAddress" }, ":8773/services/Admin' --internalurl 'http:\/\/", { "Ref" : "NovaIPAddress" }, ":8773/services/Cloud'\n"
                     ]]},
                     "mode"  : "000700",
                     "owner" : "ubuntu",
@@ -413,28 +476,33 @@
             "KeyName" : { "Ref" : "KeyName" },
             "InstanceType": { "Ref": "InstanceType" },
             "ImageId" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AMI" ] },
+            "AvailabilityZone" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AZ" ] },
             "SecurityGroups" : [ {"Ref" : "OpenStackSecurityGroup"} ],
             "Monitoring" : "false",
             "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
                "#! /bin/bash\n",
-               "# -- Update\n",
+
                "apt-get install ubuntu-cloud-keyring\n",
                "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
                "echo 'APT::Get::AllowUnauthenticated \"true\";' >> /etc/apt/apt.conf.d/70debconf\n",
                "apt-get update\n",
+               
                "apt-get -y install python-setuptools\n",
-               "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",    
+               "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",  
+               
                "function error_exit\n",
                "{\n",
                "  cfn-signal -e 1 -r \"$1\" '", { "Ref" : "KeystoneWaitHandle" }, "'\n",
                "  exit 1\n",
                "}\n",
+               
                "cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r KeystoneServer ",
                "    --access-key ",  { "Ref" : "OpenStackUserAccessKey" },
                "    --secret-key ", {"Fn::GetAtt": ["OpenStackUserAccessKey", "SecretAccessKey"]},
                "    --region ", { "Ref" : "AWS::Region" }, 
                "    --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
                "# All is well so signal success\n",
+               
                "cfn-signal -e 0 -r \"Keystone setup complete\" '", { "Ref" : "KeystoneWaitHandle" }, "'\n"
           ]]}
         }
@@ -541,13 +609,16 @@
                   "glance-api"               : [],
                   "python-glanceclient"      : [],
                   "glance-common"            : [],
-                  "python-mysqldb"           : []
+                  "python-mysqldb"           : [],
+                  "rabbitmq-server"          : []
                 }
               },
               "files" : {
                 "/opt/osonaws/setup_glance" : {
                   "content" : { "Fn::Join" : ["", [
                     "#!/bin/bash -v\n",
+                    
+                    "rabbitmqctl change_password guest password\n",
                     "rm /var/lib/glance/glance.sqlite\n",
                     "sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mysql/my.cnf\n",
 
@@ -584,33 +655,290 @@
           "KeyName" : { "Ref" : "KeyName" },
           "InstanceType": { "Ref": "InstanceType" },
           "ImageId" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AMI" ] },
+          "AvailabilityZone" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AZ" ] },
           "SecurityGroups" : [ {"Ref" : "OpenStackSecurityGroup"} ],
           "Monitoring" : "false",
           "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
             "#! /bin/bash\n",
-            "# -- Update\n",
+
             "apt-get install ubuntu-cloud-keyring\n",
             "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
             "echo 'APT::Get::AllowUnauthenticated \"true\";' >> /etc/apt/apt.conf.d/70debconf\n",
             "apt-get update\n",
+            
             "apt-get -y install python-setuptools\n",
-            "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",    
+            "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",   
+            
             "function error_exit\n",
             "{\n",
             "  cfn-signal -e 1 -r \"$1\" '", { "Ref" : "GlanceWaitHandle" }, "'\n",
             "  exit 1\n",
             "}\n",
+            
             "cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r GlanceServer ",
             "    --access-key ",  { "Ref" : "OpenStackUserAccessKey" },
             "    --secret-key ", {"Fn::GetAtt": ["OpenStackUserAccessKey", "SecretAccessKey"]},
             "    --region ", { "Ref" : "AWS::Region" }, 
             "    --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
             "# All is well so signal success\n",
+            
             "cfn-signal -e 0 -r \"Glance setup complete\" '", { "Ref" : "GlanceWaitHandle" }, "'\n"
           ]]}
         }
       }
     },
+    
+    
+    "NovaWaitHandle" : {
+        "Type" : "AWS::CloudFormation::WaitConditionHandle"
+      },
+        
+      "NovaWaitCondition" : {
+        "Type" : "AWS::CloudFormation::WaitCondition",
+        "DependsOn" : "NovaServer",
+        "Properties" : {
+          "Handle" : {"Ref" : "NovaWaitHandle"},
+          "Timeout" : "1200"
+        }
+      },      
+        
+      "NovaIPAddress" : {
+        "Type" : "AWS::EC2::EIP"
+      },
+
+      "NovaIPAssoc" : {
+        "Type" : "AWS::EC2::EIPAssociation",
+        "Properties" : {
+          "InstanceId" : { "Ref" : "NovaServer" },
+          "EIP" : { "Ref" : "NovaIPAddress" }
+        }
+      },
+        
+      "NovaServer": {
+        "Type": "AWS::EC2::Instance",
+          "Metadata" : {
+            "AWS::CloudFormation::Init" : {
+              "configSets" : {
+                "fullinstall" : [ "setup_seed", "setup_database", "setup_glance" ]
+               },
+              "setup_seed" : {
+                "files" : {
+                  "/opt/osonaws/tmp/all.preseed" : {
+                    "content" : { "Fn::Join" : ["", [
+                      "mysql-server mysql-server/root_password password ", { "Ref" : "NovaMysqlRootPassword" }, "\n",
+                      "mysql-server mysql-server/root_password_again password ", { "Ref" : "NovaMysqlRootPassword" }, "\n",
+                      "mysql-server mysql-server/start_on_boot boolean true\n"
+                    ]]},
+                    "mode"  : "000600",
+                    "owner" : "ubuntu",
+                    "group" : "ubuntu"
+                  },
+                  "/opt/osonaws/tmp/setup_seed" : {
+                    "content" : { "Fn::Join" : ["", [
+                      "#!/bin/bash -v\n",
+                      "debconf-set-selections < /opt/osonaws/tmp/all.preseed\n"
+                    ]]},
+                    "mode"  : "000700",
+                    "owner" : "ubuntu",
+                    "group" : "ubuntu"
+                  }
+                },
+                "commands" : {
+                  "01_seed" : {
+                    "command" : "/opt/osonaws/tmp/setup_seed"
+                  }
+                }
+              },
+              "setup_database" : {
+                "packages" : {
+                  "apt" : {
+                    "mysql-server"            : []
+                  }
+                },
+                "files" : {
+                  "/opt/osonaws/setup.mysql" : {
+                    "content" : { "Fn::Join" : ["", [
+                      "CREATE DATABASE nova;\n",
+                      "GRANT ALL ON glance.* TO 'nova'@'%' IDENTIFIED BY '", { "Ref" : "NovaMysqlUserPassword" }, "';\n",
+                      "GRANT ALL ON glance.* TO 'nova'@'localhost' IDENTIFIED BY '", { "Ref" : "NovaMysqlUserPassword" }, "';\n"
+                    ]]},
+                    "mode"  : "000600",
+                    "owner" : "ubuntu",
+                    "group" : "ubuntu"
+                  },
+                  "/opt/osonaws/setup_database" : {
+                    "content" : { "Fn::Join" : ["", [
+                      "#!/bin/bash -v\n",
+                      "mysql -u root --password='", { "Ref" : "NovaMysqlRootPassword" }, "' < /opt/osonaws/setup.mysql\n"
+                    ]]},
+                    "mode"  : "000700",
+                    "owner" : "ubuntu",
+                    "group" : "ubuntu"
+                  }
+                },
+                "commands" : {
+                  "01_setup_database" : {
+                    "command" : "/opt/osonaws/setup_database"
+                  }
+                }
+              },
+              "setup_glance" : {
+                "packages" : {
+                  "apt" : {
+                    "nova-api"                   : [],
+                    "nova-cert"               : [],
+                    "nova-common"      : [],
+                    "nova-scheduler"            : [],
+                    "python-nova"            : [],
+                    "python-novaclient"            : [],
+                    "novnc"            : [],
+                    "nova-novncproxy"            : [],
+                    "python-mysqldb"           : [],
+                    "rabbitmq-server"       : []
+                  }
+                },
+                "files" : {
+                  "/opt/osonaws/setup_nova" : {
+                    "content" : { "Fn::Join" : ["", [
+                      "#!/bin/bash -v\n",
+                      
+                      "rabbitmqctl change_password guest password\n",
+                      "sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mysql/my.cnf\n",
+
+                      "sed -i '/volume/d' /etc/nova/api-paste.ini\n",
+                      "sed -i '/nova.api.auth:pipeline_factory/d' /etc/nova/api-paste.ini\n",
+                      "sed -i '/call:nova.api.openstack.urlmap:urlmap_factory/d' /etc/nova/api-paste.ini\n",                     
+                      
+                      "sed -i 's/auth_host = 127.0.0.1/auth_host =", { "Ref" : "KeystoneIPAddress" }, "/g' /etc/nova/api-paste.ini\n",
+                      "sed -i 's/service_host = 127.0.0.1/service_host =", { "Ref" : "KeystoneIPAddress" }, "/g' /etc/nova/api-paste.ini\n",
+                      "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/nova/api-paste.ini\n",
+                      "sed -i 's/%SERVICE_USER%/nova/g' /etc/nova/api-paste.ini\n",
+                      "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "KeystoneNovaUserPassword" }, "/g' /etc/etc/nova/api-paste.ini\n",    
+                      
+                      "echo \"\n",
+                      "[DEFAULT]\n",
+
+                      "# MySQL Connection #\n",
+                      "sql_connection=mysql://nova:", { "Ref" : "NovaMysqlUserPassword" }, "@0.0.0.0/nova\n",
+                        
+                      "# nova-scheduler #\n",
+                      "rabbit_password=password\n",
+                      "scheduler_driver=nova.scheduler.simple.SimpleScheduler\n",
+                        
+                      "# nova-api #\n",
+                      "cc_host=", { "Ref" : "NovaIPAddress" }, "\n",
+                      "auth_strategy=keystone\n",
+                        "s3_host=", { "Ref" : "NovaIPAddress" }, "\n",
+                        "ec2_host=", { "Ref" : "NovaIPAddress" }, "\n",
+                        "nova_url=http://", { "Ref" : "NovaIPAddress" }, ":8774/v1.1/\n",
+                        "ec2_url=http://", { "Ref" : "NovaIPAddress" }, ":8773/services/Cloud\n",
+                        "keystone_ec2_url=http://", { "Ref" : "KeystoneIPAddress" }, ":5000/v2.0/ec2tokens\n",
+                        "api_paste_config=/etc/nova/api-paste.ini\n",
+                        "allow_admin_api=true\n",
+                        "use_deprecated_auth=false\n",
+                        "ec2_private_dns_show_ip=True\n",
+                        "dmz_cidr=169.254.169.254/32\n",
+                        "ec2_dmz_host=", { "Ref" : "NovaIPAddress" }, "\n",
+                        "metadata_host=", { "Ref" : "NovaIPAddress" }, "\n",
+                        "metadata_listen=0.0.0.0\n",
+                        "enabled_apis=ec2,osapi_compute,metadata\n",
+                        
+                        "# Networking #\n",
+                        "network_api_class=nova.network.quantumv2.api.API\n",
+                        "quantum_url=http://", { "Ref" : "NovaIPAddress" }, ":9696\n",
+                        "quantum_auth_strategy=keystone\n",
+                        "quantum_admin_tenant_name=service\n",
+                        "quantum_admin_username=quantum\n",
+                        "quantum_admin_password=password\n",
+                        "quantum_admin_auth_url=http://", { "Ref" : "NovaIPAddress" }, ":35357/v2.0\n",
+                        "libvirt_vif_driver=nova.virt.libvirt.vif.LibvirtHybridOVSBridgeDriver\n",
+                        "linuxnet_interface_driver=nova.network.linux_net.LinuxOVSInterfaceDriver  \n",
+                        "firewall_driver=nova.virt.libvirt.firewall.IptablesFirewallDriver\n",
+                        
+                        "# Cinder #\n",
+                        "volume_api_class=nova.volume.cinder.API\n",
+                        
+                        "# Glance #\n",
+                        "glance_api_servers=", { "Ref" : "GlanceIPAddress" }, ":9292\n",
+                        "image_service=nova.image.glance.GlanceImageService\n",
+                        
+                        "# novnc #\n",
+                        "novnc_enable=true\n",
+                        "novncproxy_base_url=http://", { "Ref" : "NovaIPAddress" }, ":6080/vnc_auto.html\n",
+                        "vncserver_proxyclient_address=127.0.0.1\n",
+                        "vncserver_listen=0.0.0.0\n",
+                        
+                        "# Misc #\n",
+                        "logdir=/var/log/nova\n",   
+                        "state_path=/var/lib/nova\n",
+                        "lock_path=/var/lock/nova\n",
+                        "root_helper=sudo nova-rootwrap /etc/nova/rootwrap.conf\n",
+                        "verbose=true\" >> /etc/nova/nova.conf\n",
+                      
+                        "service mysql restart\n",
+                      "nova-manage db sync\n",
+                      "service nova-api restart\n",
+                        "service nova-cert restart\n",
+                        "service nova-consoleauth restart\n",
+                        "service nova-scheduler restart\n",
+                        "service nova-novncproxy restart\n"
+                    ]]},
+                    "mode"  : "000700",
+                    "owner" : "ubuntu",
+                    "group" : "ubuntu"
+                  }
+                },
+                "commands" : {
+                  "01_setup_glance" : {
+                    "command" : "/opt/osonaws/setup_nova"
+                  }
+                }
+              }
+            }
+          },
+          "Properties" : {
+            "KeyName" : { "Ref" : "KeyName" },
+            "InstanceType": { "Ref": "InstanceType" },
+            "ImageId" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AMI" ] },
+            "AvailabilityZone" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AZ" ] },
+            "SecurityGroups" : [ {"Ref" : "OpenStackSecurityGroup"} ],
+            "Monitoring" : "false",
+            "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
+              "#! /bin/bash\n",
+
+              "apt-get install ubuntu-cloud-keyring\n",
+              "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
+              "echo 'APT::Get::AllowUnauthenticated \"true\";' >> /etc/apt/apt.conf.d/70debconf\n",
+              "apt-get update\n",
+              
+              "apt-get -y install python-setuptools\n",
+              "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",   
+              
+              "function error_exit\n",
+              "{\n",
+              "  cfn-signal -e 1 -r \"$1\" '", { "Ref" : "NovaWaitHandle" }, "'\n",
+              "  exit 1\n",
+              "}\n",
+              
+              "cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r NovaServer ",
+              "    --access-key ",  { "Ref" : "OpenStackUserAccessKey" },
+              "    --secret-key ", {"Fn::GetAtt": ["OpenStackUserAccessKey", "SecretAccessKey"]},
+              "    --region ", { "Ref" : "AWS::Region" }, 
+              "    --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
+              "# All is well so signal success\n",
+              
+              "cfn-signal -e 0 -r \"Nova setup complete\" '", { "Ref" : "NovaWaitHandle" }, "'\n"
+            ]]}
+          }
+        }
+      },
+    
+    
+    
+    
+    
+    
+    
 
     "CinderWaitHandle" : {
       "Type" : "AWS::CloudFormation::WaitConditionHandle"
@@ -766,28 +1094,33 @@
           "InstanceType": { "Ref": "InstanceType" },
           "ImageId" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AMI" ] },
           "Volumes" : [{ "VolumeId" : { "Ref" : "CinderVolume" }, "Device" : "/dev/sdh" }],
+          "AvailabilityZone" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AZ" ] },
           "SecurityGroups" : [ {"Ref" : "OpenStackSecurityGroup"} ],
           "Monitoring" : "false",
           "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
             "#! /bin/bash\n",
-            "# -- Update\n",
+
             "apt-get install ubuntu-cloud-keyring\n",
             "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
             "echo 'APT::Get::AllowUnauthenticated \"true\";' >> /etc/apt/apt.conf.d/70debconf\n",
-            "apt-get update && apt-get upgrade -y --force-yes\n",
+            "apt-get update\n",
+            
             "apt-get -y install python-setuptools\n",
-            "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",    
+            "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",
+            
             "function error_exit\n",
             "{\n",
             "  cfn-signal -e 1 -r \"$1\" '", { "Ref" : "CinderWaitHandle" }, "'\n",
             "  exit 1\n",
             "}\n",
+            
             "cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r CinderServer ",
             "    --access-key ",  { "Ref" : "OpenStackUserAccessKey" },
             "    --secret-key ", {"Fn::GetAtt": ["OpenStackUserAccessKey", "SecretAccessKey"]},
             "    --region ", { "Ref" : "AWS::Region" }, 
             "    --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
             "# All is well so signal success\n",
+            
             "cfn-signal -e 0 -r \"Cinder setup complete\" '", { "Ref" : "CinderWaitHandle" }, "'\n"
           ]]}
         }
