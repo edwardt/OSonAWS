@@ -686,206 +686,205 @@
           ]]}
         }
       }
-    },
-    
+    },  
     
     "NovaWaitHandle" : {
-        "Type" : "AWS::CloudFormation::WaitConditionHandle"
-      },
+      "Type" : "AWS::CloudFormation::WaitConditionHandle"
+    },
         
-      "NovaWaitCondition" : {
-        "Type" : "AWS::CloudFormation::WaitCondition",
-        "DependsOn" : "NovaServer",
-        "Properties" : {
-          "Handle" : {"Ref" : "NovaWaitHandle"},
-          "Timeout" : "1200"
-        }
-      },      
+    "NovaWaitCondition" : {
+      "Type" : "AWS::CloudFormation::WaitCondition",
+      "DependsOn" : "NovaServer",
+      "Properties" : {
+        "Handle" : {"Ref" : "NovaWaitHandle"},
+        "Timeout" : "1200"
+      }
+    },      
         
-      "NovaIPAddress" : {
-        "Type" : "AWS::EC2::EIP"
-      },
-
-      "NovaIPAssoc" : {
-        "Type" : "AWS::EC2::EIPAssociation",
-        "Properties" : {
-          "InstanceId" : { "Ref" : "NovaServer" },
-          "EIP" : { "Ref" : "NovaIPAddress" }
-        }
-      },
+    "NovaIPAddress" : {
+      "Type" : "AWS::EC2::EIP"
+    },
+    
+    "NovaIPAssoc" : {
+      "Type" : "AWS::EC2::EIPAssociation",
+      "Properties" : {
+        "InstanceId" : { "Ref" : "NovaServer" },
+        "EIP" : { "Ref" : "NovaIPAddress" }
+      }
+    },
         
-      "NovaServer": {
-        "Type": "AWS::EC2::Instance",
-          "Metadata" : {
-            "AWS::CloudFormation::Init" : {
-              "configSets" : {
-                "fullinstall" : [ "setup_seed", "setup_database", "setup_glance" ]
-               },
-              "setup_seed" : {
-                "files" : {
-                  "/opt/osonaws/tmp/all.preseed" : {
-                    "content" : { "Fn::Join" : ["", [
-                      "mysql-server mysql-server/root_password password ", { "Ref" : "NovaMysqlRootPassword" }, "\n",
-                      "mysql-server mysql-server/root_password_again password ", { "Ref" : "NovaMysqlRootPassword" }, "\n",
-                      "mysql-server mysql-server/start_on_boot boolean true\n"
-                    ]]},
-                    "mode"  : "000600",
-                    "owner" : "ubuntu",
-                    "group" : "ubuntu"
-                  },
-                  "/opt/osonaws/tmp/setup_seed" : {
-                    "content" : { "Fn::Join" : ["", [
-                      "#!/bin/bash -v\n",
-                      "debconf-set-selections < /opt/osonaws/tmp/all.preseed\n"
-                    ]]},
-                    "mode"  : "000700",
-                    "owner" : "ubuntu",
-                    "group" : "ubuntu"
-                  }
+    "NovaServer": {
+      "Type": "AWS::EC2::Instance",
+        "Metadata" : {
+          "AWS::CloudFormation::Init" : {
+            "configSets" : {
+              "fullinstall" : [ "setup_seed", "setup_database", "setup_nova" ]
+             },
+            "setup_seed" : {
+              "files" : {
+                "/opt/osonaws/tmp/all.preseed" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "mysql-server mysql-server/root_password password ", { "Ref" : "NovaMysqlRootPassword" }, "\n",
+                    "mysql-server mysql-server/root_password_again password ", { "Ref" : "NovaMysqlRootPassword" }, "\n",
+                    "mysql-server mysql-server/start_on_boot boolean true\n"
+                  ]]},
+                  "mode"  : "000600",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
                 },
-                "commands" : {
-                  "01_seed" : {
-                    "command" : "/opt/osonaws/tmp/setup_seed"
-                  }
+                "/opt/osonaws/tmp/setup_seed" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -v\n",
+                    "debconf-set-selections < /opt/osonaws/tmp/all.preseed\n"
+                  ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
                 }
               },
-              "setup_database" : {
-                "packages" : {
-                  "apt" : {
-                    "mysql-server"            : []
-                  }
-                },
-                "files" : {
-                  "/opt/osonaws/setup.mysql" : {
-                    "content" : { "Fn::Join" : ["", [
-                      "CREATE DATABASE nova;\n",
-                      "GRANT ALL ON glance.* TO 'nova'@'%' IDENTIFIED BY '", { "Ref" : "NovaMysqlUserPassword" }, "';\n",
-                      "GRANT ALL ON glance.* TO 'nova'@'localhost' IDENTIFIED BY '", { "Ref" : "NovaMysqlUserPassword" }, "';\n"
-                    ]]},
-                    "mode"  : "000600",
-                    "owner" : "ubuntu",
-                    "group" : "ubuntu"
-                  },
-                  "/opt/osonaws/setup_database" : {
-                    "content" : { "Fn::Join" : ["", [
-                      "#!/bin/bash -v\n",
-                      "mysql -u root --password='", { "Ref" : "NovaMysqlRootPassword" }, "' < /opt/osonaws/setup.mysql\n"
-                    ]]},
-                    "mode"  : "000700",
-                    "owner" : "ubuntu",
-                    "group" : "ubuntu"
-                  }
-                },
-                "commands" : {
-                  "01_setup_database" : {
-                    "command" : "/opt/osonaws/setup_database"
-                  }
+              "commands" : {
+                "01_seed" : {
+                  "command" : "/opt/osonaws/tmp/setup_seed"
+                }
+              }
+            },
+            "setup_database" : {
+              "packages" : {
+                "apt" : {
+                  "mysql-server"            : []
                 }
               },
-              "setup_glance" : {
-                "packages" : {
-                  "apt" : {
-                    "nova-api"                   : [],
-                    "nova-cert"               : [],
-                    "nova-common"      : [],
-                    "nova-scheduler"            : [],
-                    "python-nova"            : [],
-                    "python-novaclient"            : [],
-                    "novnc"            : [],
-                    "nova-novncproxy"            : [],
-                    "python-mysqldb"           : [],
-                    "rabbitmq-server"       : []
-                  }
+              "files" : {
+                "/opt/osonaws/setup.mysql" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "CREATE DATABASE nova;\n",
+                    "GRANT ALL ON glance.* TO 'nova'@'%' IDENTIFIED BY '", { "Ref" : "NovaMysqlUserPassword" }, "';\n",
+                    "GRANT ALL ON glance.* TO 'nova'@'localhost' IDENTIFIED BY '", { "Ref" : "NovaMysqlUserPassword" }, "';\n"
+                  ]]},
+                  "mode"  : "000600",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
                 },
-                "files" : {
-                  "/opt/osonaws/setup_nova" : {
-                    "content" : { "Fn::Join" : ["", [
-                      "#!/bin/bash -v\n",
+                "/opt/osonaws/setup_database" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -v\n",
+                    "mysql -u root --password='", { "Ref" : "NovaMysqlRootPassword" }, "' < /opt/osonaws/setup.mysql\n"
+                  ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                }
+              },
+              "commands" : {
+                "01_setup_database" : {
+                  "command" : "/opt/osonaws/setup_database"
+                }
+              }
+            },
+            "setup_nova" : {
+              "packages" : {
+                "apt" : {
+                  "nova-api"          : [],
+                  "nova-cert"         : [],
+                  "nova-common"       : [],
+                  "nova-scheduler"    : [],
+                  "python-nova"       : [],
+                  "python-novaclient" : [],
+                  "novnc"             : [],
+                  "nova-novncproxy"   : [],
+                  "python-mysqldb"    : [],
+                  "rabbitmq-server"   : []
+                }
+              },
+              "files" : {
+                "/opt/osonaws/setup_nova" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -v\n",
                       
-                      "rabbitmqctl change_password guest password\n",
-                      "sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mysql/my.cnf\n",
+                    "rabbitmqctl change_password guest password\n",
+                    "sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mysql/my.cnf\n",
 
-                      "sed -i '/volume/d' /etc/nova/api-paste.ini\n",
-                      "sed -i '/nova.api.auth:pipeline_factory/d' /etc/nova/api-paste.ini\n",
-                      "sed -i '/call:nova.api.openstack.urlmap:urlmap_factory/d' /etc/nova/api-paste.ini\n",                     
+                    "sed -i '/volume/d' /etc/nova/api-paste.ini\n",
+                    "sed -i '/nova.api.auth:pipeline_factory/d' /etc/nova/api-paste.ini\n",
+                    "sed -i '/call:nova.api.openstack.urlmap:urlmap_factory/d' /etc/nova/api-paste.ini\n",                     
                       
-                      "sed -i 's/auth_host = 127.0.0.1/auth_host =", { "Ref" : "KeystoneIPAddress" }, "/g' /etc/nova/api-paste.ini\n",
-                      "sed -i 's/service_host = 127.0.0.1/service_host =", { "Ref" : "KeystoneIPAddress" }, "/g' /etc/nova/api-paste.ini\n",
-                      "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/nova/api-paste.ini\n",
-                      "sed -i 's/%SERVICE_USER%/nova/g' /etc/nova/api-paste.ini\n",
-                      "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "KeystoneNovaUserPassword" }, "/g' /etc/etc/nova/api-paste.ini\n",    
+                    "sed -i 's/auth_host = 127.0.0.1/auth_host =", { "Ref" : "KeystoneIPAddress" }, "/g' /etc/nova/api-paste.ini\n",
+                    "sed -i 's/service_host = 127.0.0.1/service_host =", { "Ref" : "KeystoneIPAddress" }, "/g' /etc/nova/api-paste.ini\n",
+                    "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/nova/api-paste.ini\n",
+                    "sed -i 's/%SERVICE_USER%/nova/g' /etc/nova/api-paste.ini\n",
+                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "KeystoneNovaUserPassword" }, "/g' /etc/etc/nova/api-paste.ini\n",    
                       
-                      "echo \"\n",
-                      "[DEFAULT]\n",
+                    "echo \"\n",
+                    "[DEFAULT]\n",
 
-                      "# MySQL Connection #\n",
-                      "sql_connection=mysql://nova:", { "Ref" : "NovaMysqlUserPassword" }, "@0.0.0.0/nova\n",
+                    "# MySQL Connection #\n",
+                    "sql_connection=mysql://nova:", { "Ref" : "NovaMysqlUserPassword" }, "@0.0.0.0/nova\n",
                         
-                      "# nova-scheduler #\n",
-                      "rabbit_password=password\n",
-                      "scheduler_driver=nova.scheduler.simple.SimpleScheduler\n",
+                    "# nova-scheduler #\n",
+                    "rabbit_password=password\n",
+                    "scheduler_driver=nova.scheduler.simple.SimpleScheduler\n",
                         
-                      "# nova-api #\n",
-                      "cc_host=", { "Ref" : "NovaIPAddress" }, "\n",
-                      "auth_strategy=keystone\n",
-                        "s3_host=", { "Ref" : "NovaIPAddress" }, "\n",
-                        "ec2_host=", { "Ref" : "NovaIPAddress" }, "\n",
-                        "nova_url=http://", { "Ref" : "NovaIPAddress" }, ":8774/v1.1/\n",
-                        "ec2_url=http://", { "Ref" : "NovaIPAddress" }, ":8773/services/Cloud\n",
-                        "keystone_ec2_url=http://", { "Ref" : "KeystoneIPAddress" }, ":5000/v2.0/ec2tokens\n",
-                        "api_paste_config=/etc/nova/api-paste.ini\n",
-                        "allow_admin_api=true\n",
-                        "use_deprecated_auth=false\n",
-                        "ec2_private_dns_show_ip=True\n",
-                        "dmz_cidr=169.254.169.254/32\n",
-                        "ec2_dmz_host=", { "Ref" : "NovaIPAddress" }, "\n",
-                        "metadata_host=", { "Ref" : "NovaIPAddress" }, "\n",
-                        "metadata_listen=0.0.0.0\n",
-                        "enabled_apis=ec2,osapi_compute,metadata\n",
-                        
-                        "# Networking #\n",
-                        "network_api_class=nova.network.quantumv2.api.API\n",
-                        "quantum_url=http://", { "Ref" : "NovaIPAddress" }, ":9696\n",
-                        "quantum_auth_strategy=keystone\n",
-                        "quantum_admin_tenant_name=service\n",
-                        "quantum_admin_username=quantum\n",
-                        "quantum_admin_password=password\n",
-                        "quantum_admin_auth_url=http://", { "Ref" : "NovaIPAddress" }, ":35357/v2.0\n",
-                        "libvirt_vif_driver=nova.virt.libvirt.vif.LibvirtHybridOVSBridgeDriver\n",
-                        "linuxnet_interface_driver=nova.network.linux_net.LinuxOVSInterfaceDriver  \n",
-                        "firewall_driver=nova.virt.libvirt.firewall.IptablesFirewallDriver\n",
-                        
-                        "# Cinder #\n",
-                        "volume_api_class=nova.volume.cinder.API\n",
-                        
-                        "# Glance #\n",
-                        "glance_api_servers=", { "Ref" : "GlanceIPAddress" }, ":9292\n",
-                        "image_service=nova.image.glance.GlanceImageService\n",
-                        
-                        "# novnc #\n",
-                        "novnc_enable=true\n",
-                        "novncproxy_base_url=http://", { "Ref" : "NovaIPAddress" }, ":6080/vnc_auto.html\n",
-                        "vncserver_proxyclient_address=127.0.0.1\n",
-                        "vncserver_listen=0.0.0.0\n",
-                        
-                        "# Misc #\n",
-                        "logdir=/var/log/nova\n",   
-                        "state_path=/var/lib/nova\n",
-                        "lock_path=/var/lock/nova\n",
-                        "root_helper=sudo nova-rootwrap /etc/nova/rootwrap.conf\n",
-                        "verbose=true\" >> /etc/nova/nova.conf\n",
+                    "# nova-api #\n",
+                    "cc_host=", { "Ref" : "NovaIPAddress" }, "\n",
+                    "auth_strategy=keystone\n",
+                    "s3_host=", { "Ref" : "NovaIPAddress" }, "\n",
+                    "ec2_host=", { "Ref" : "NovaIPAddress" }, "\n",
+                    "nova_url=http://", { "Ref" : "NovaIPAddress" }, ":8774/v1.1/\n",
+                    "ec2_url=http://", { "Ref" : "NovaIPAddress" }, ":8773/services/Cloud\n",
+                    "keystone_ec2_url=http://", { "Ref" : "KeystoneIPAddress" }, ":5000/v2.0/ec2tokens\n",
+                    "api_paste_config=/etc/nova/api-paste.ini\n",
+                    "allow_admin_api=true\n",
+                    "use_deprecated_auth=false\n",
+                    "ec2_private_dns_show_ip=True\n",
+                    "dmz_cidr=169.254.169.254/32\n",
+                    "ec2_dmz_host=", { "Ref" : "NovaIPAddress" }, "\n",
+                    "metadata_host=", { "Ref" : "NovaIPAddress" }, "\n",
+                    "metadata_listen=0.0.0.0\n",
+                    "enabled_apis=ec2,osapi_compute,metadata\n",
+                       
+                    "# Networking #\n",
+                    "network_api_class=nova.network.quantumv2.api.API\n",
+                    "quantum_url=http://", { "Ref" : "NovaIPAddress" }, ":9696\n",
+                    "quantum_auth_strategy=keystone\n",
+                    "quantum_admin_tenant_name=service\n",
+                    "quantum_admin_username=quantum\n",
+                    "quantum_admin_password=password\n",
+                    "quantum_admin_auth_url=http://", { "Ref" : "NovaIPAddress" }, ":35357/v2.0\n",
+                    "libvirt_vif_driver=nova.virt.libvirt.vif.LibvirtHybridOVSBridgeDriver\n",
+                    "linuxnet_interface_driver=nova.network.linux_net.LinuxOVSInterfaceDriver  \n",
+                    "firewall_driver=nova.virt.libvirt.firewall.IptablesFirewallDriver\n",
                       
-                        "service mysql restart\n",
-                      "nova-manage db sync\n",
-                      "service nova-api restart\n",
-                        "service nova-cert restart\n",
-                        "service nova-consoleauth restart\n",
-                        "service nova-scheduler restart\n",
-                        "service nova-novncproxy restart\n"
+                    "# Cinder #\n",
+                    "volume_api_class=nova.volume.cinder.API\n",
+                        
+                    "# Glance #\n",
+                    "glance_api_servers=", { "Ref" : "GlanceIPAddress" }, ":9292\n",
+                    "image_service=nova.image.glance.GlanceImageService\n",
+                       
+                    "# novnc #\n",
+                    "novnc_enable=true\n",
+                    "novncproxy_base_url=http://", { "Ref" : "NovaIPAddress" }, ":6080/vnc_auto.html\n",
+                    "vncserver_proxyclient_address=127.0.0.1\n",
+                    "vncserver_listen=0.0.0.0\n",
+                      
+                    "# Misc #\n",
+                    "logdir=/var/log/nova\n",   
+                    "state_path=/var/lib/nova\n",
+                    "lock_path=/var/lock/nova\n",
+                    "root_helper=sudo nova-rootwrap /etc/nova/rootwrap.conf\n",
+                    "verbose=true\" >> /etc/nova/nova.conf\n",
+                     
+                    "service mysql restart\n",
+                    "nova-manage db sync\n",
+                    "service nova-api restart\n",
+                    "service nova-cert restart\n",
+                    "service nova-consoleauth restart\n",
+                    "service nova-scheduler restart\n",
+                    "service nova-novncproxy restart\n"
                     ]]},
-                    "mode"  : "000700",
-                    "owner" : "ubuntu",
-                    "group" : "ubuntu"
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
                   }
                 },
                 "commands" : {
@@ -928,17 +927,10 @@
               "# All is well so signal success\n",
               
               "cfn-signal -e 0 -r \"Nova setup complete\" '", { "Ref" : "NovaWaitHandle" }, "'\n"
-            ]]}
-          }
+          ]]}
         }
-      },
-    
-    
-    
-    
-    
-    
-    
+      }
+    },
 
     "CinderWaitHandle" : {
       "Type" : "AWS::CloudFormation::WaitConditionHandle"
@@ -1129,10 +1121,10 @@
     
     "CinderVolume" : {
       "Type" : "AWS::EC2::Volume",
-        "Properties" : {
-          "Size" : {"Ref" : "CinderVolumeSize"},
-          "AvailabilityZone" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AZ" ] }
-        }
+      "Properties" : {
+        "Size" : {"Ref" : "CinderVolumeSize"},
+        "AvailabilityZone" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AZ" ] }
+      }
     }
   },
 
