@@ -164,52 +164,58 @@
     },
     
     "NovaMysqlRootPassword": {
-        "Default": "WSORa6xTu2",
-        "Description" : "Nova's MySQL root password",
-        "Type": "String",
-        "MinLength": "1",
-        "MaxLength": "64",
-        "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
-        "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
-      },
+      "Default": "WSORa6xTu2",
+      "Description" : "Nova's MySQL root password",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "64",
+      "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
+      "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
+    },
         
-      "NovaMysqlUserPassword": {
-        "Default": "IWur6lc2CQ",
-        "Description" : "Nova's MySQL user password",
-        "Type": "String",
-        "MinLength": "1",
-        "MaxLength": "64",
-        "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
-        "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
-      },
-        
-      "KeystoneNovaUserPassword": {
-        "Default": "icXyuCaywR",
-        "Description" : "Keystone Nova user password",
-        "Type": "String",
-        "MinLength": "1",
-        "MaxLength": "64",
-        "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
-        "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
-      }
-    
-    
-    
-    
+    "NovaMysqlUserPassword": {
+      "Default": "IWur6lc2CQ",
+      "Description" : "Nova's MySQL user password",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "64",
+      "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
+      "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
+    },
+  
+    "KeystoneNovaUserPassword": {
+      "Default": "icXyuCaywR",
+      "Description" : "Keystone Nova user password",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "64",
+      "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
+      "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
+    },
+      
+    "RabbitPassword": {
+      "Default": "Rabbit",
+      "Description" : "RabbitMQ password",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "64",
+      "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
+      "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
+    }  
   },
 
   "Mappings" : {
 
     "AWSRegionMap" : {
-        "us-east-1"      : { "AMI" : "ami-3d4ff254", "AZ" : "us-east-1a" },
-        "us-west-1"      : { "AMI" : "ami-0d153248", "AZ" : "us-west-1a" },
-        "us-west-2"      : { "AMI" : "ami-8e109ebe", "AZ" : "us-west-2a" },
-        "eu-west-1"      : { "AMI" : "ami-c1aaabb5", "AZ" : "eu-west-1a" },
-        "sa-east-1"      : { "AMI" : "ami-c819c0d5", "AZ" : "sa-east-1a" },
-        "ap-southeast-1" : { "AMI" : "ami-acf6b0fe", "AZ" : "ap-southeast-1a" },
-        "ap-northeast-1" : { "AMI" : "ami-22ad1223", "AZ" : "ap-northeast-1a" },
-        "ap-southeast-2" : { "AMI" : "ami-fb8611c1", "AZ" : "ap-southeast-2a" }
-      }
+      "us-east-1"      : { "AMI" : "ami-3d4ff254", "AZ" : "us-east-1a" },
+      "us-west-1"      : { "AMI" : "ami-0d153248", "AZ" : "us-west-1a" },
+      "us-west-2"      : { "AMI" : "ami-8e109ebe", "AZ" : "us-west-2a" },
+      "eu-west-1"      : { "AMI" : "ami-c1aaabb5", "AZ" : "eu-west-1a" },
+      "sa-east-1"      : { "AMI" : "ami-c819c0d5", "AZ" : "sa-east-1a" },
+      "ap-southeast-1" : { "AMI" : "ami-acf6b0fe", "AZ" : "ap-southeast-1a" },
+      "ap-northeast-1" : { "AMI" : "ami-22ad1223", "AZ" : "ap-northeast-1a" },
+      "ap-southeast-2" : { "AMI" : "ami-fb8611c1", "AZ" : "ap-southeast-2a" }
+    }
   },
 
   "Resources" : {
@@ -360,8 +366,7 @@
                   "apt" : {
                     "keystone"                 : [],
                     "python-mysqldb"           : [],
-                    "python-keystoneclient"    : [],
-                    "rabbitmq-server"          : []
+                    "python-keystoneclient"    : []
                   }
                 },
                 "files" : {
@@ -369,7 +374,6 @@
                     "content" : { "Fn::Join" : ["", [
                       "#!/bin/bash -v\n",
                       
-                      "rabbitmqctl change_password guest password\n",
                       "rm /var/lib/keystone/keystone.db\n",
                       "sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mysql/my.cnf\n",
                       "sed -i \"s/sqlite:\\/\\/\\/\\/var\\/lib\\/keystone\\/keystone.db\/mysql:\\/\\/keystone:", { "Ref" : "KeystoneMysqlUserPassword" }, "@0.0.0.0\\/keystone\/g\" /etc/keystone/keystone.conf\n",
@@ -609,16 +613,14 @@
                   "glance-api"               : [],
                   "python-glanceclient"      : [],
                   "glance-common"            : [],
-                  "python-mysqldb"           : [],
-                  "rabbitmq-server"          : []
+                  "python-mysqldb"           : []
                 }
               },
               "files" : {
                 "/opt/osonaws/setup_glance" : {
                   "content" : { "Fn::Join" : ["", [
                     "#!/bin/bash -v\n",
-                    
-                    "rabbitmqctl change_password guest password\n",
+                  
                     "rm /var/lib/glance/glance.sqlite\n",
                     "sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mysql/my.cnf\n",
 
@@ -758,8 +760,8 @@
                 "/opt/osonaws/setup.mysql" : {
                   "content" : { "Fn::Join" : ["", [
                     "CREATE DATABASE nova;\n",
-                    "GRANT ALL ON glance.* TO 'nova'@'%' IDENTIFIED BY '", { "Ref" : "NovaMysqlUserPassword" }, "';\n",
-                    "GRANT ALL ON glance.* TO 'nova'@'localhost' IDENTIFIED BY '", { "Ref" : "NovaMysqlUserPassword" }, "';\n"
+                    "GRANT ALL ON nova.* TO 'nova'@'%' IDENTIFIED BY '", { "Ref" : "NovaMysqlUserPassword" }, "';\n",
+                    "GRANT ALL ON nova.* TO 'nova'@'localhost' IDENTIFIED BY '", { "Ref" : "NovaMysqlUserPassword" }, "';\n"
                   ]]},
                   "mode"  : "000600",
                   "owner" : "ubuntu",
@@ -800,20 +802,20 @@
                 "/opt/osonaws/setup_nova" : {
                   "content" : { "Fn::Join" : ["", [
                     "#!/bin/bash -v\n",
-                      
-                    "rabbitmqctl change_password guest password\n",
+                    
+                    "rabbitmqctl change_password guest ", { "Ref" : "RabbitPassword" }, "\n",                   
                     "sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mysql/my.cnf\n",
 
-                    "sed -i '/volume/d' /etc/nova/api-paste.ini\n",
-                    "sed -i '/nova.api.auth:pipeline_factory/d' /etc/nova/api-paste.ini\n",
-                    "sed -i '/call:nova.api.openstack.urlmap:urlmap_factory/d' /etc/nova/api-paste.ini\n",                     
+                    "#sed -i '/volume/d' /etc/nova/api-paste.ini\n",
+                    "#sed -i '/nova.api.auth:pipeline_factory/d' /etc/nova/api-paste.ini\n",
+                    "#sed -i '/call:nova.api.openstack.urlmap:urlmap_factory/d' /etc/nova/api-paste.ini\n",                     
                       
                     "sed -i 's/auth_host = 127.0.0.1/auth_host =", { "Ref" : "KeystoneIPAddress" }, "/g' /etc/nova/api-paste.ini\n",
                     "sed -i 's/service_host = 127.0.0.1/service_host =", { "Ref" : "KeystoneIPAddress" }, "/g' /etc/nova/api-paste.ini\n",
                     "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/nova/api-paste.ini\n",
                     "sed -i 's/%SERVICE_USER%/nova/g' /etc/nova/api-paste.ini\n",
-                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "KeystoneNovaUserPassword" }, "/g' /etc/etc/nova/api-paste.ini\n",    
-                      
+                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "KeystoneNovaUserPassword" }, "/g' /etc/nova/api-paste.ini\n",    
+
                     "echo \"\n",
                     "[DEFAULT]\n",
 
@@ -821,7 +823,8 @@
                     "sql_connection=mysql://nova:", { "Ref" : "NovaMysqlUserPassword" }, "@0.0.0.0/nova\n",
                         
                     "# nova-scheduler #\n",
-                    "rabbit_password=password\n",
+                    "rabbit_host=", { "Ref" : "NovaIPAddress" }, "\n",
+                    "rabbit_password=", { "Ref" : "RabbitPassword" }, "\n",
                     "scheduler_driver=nova.scheduler.simple.SimpleScheduler\n",
                         
                     "# nova-api #\n",
@@ -872,7 +875,7 @@
                     "state_path=/var/lib/nova\n",
                     "lock_path=/var/lock/nova\n",
                     "root_helper=sudo nova-rootwrap /etc/nova/rootwrap.conf\n",
-                    "verbose=true\" >> /etc/nova/nova.conf\n",
+                    "verbose=true\" > /etc/nova/nova.conf\n",
                      
                     "service mysql restart\n",
                     "nova-manage db sync\n",
@@ -881,6 +884,7 @@
                     "service nova-consoleauth restart\n",
                     "service nova-scheduler restart\n",
                     "service nova-novncproxy restart\n"
+                    
                     ]]},
                   "mode"  : "000700",
                   "owner" : "ubuntu",
@@ -931,7 +935,7 @@
         }
       }
     },
-
+    
     "CinderWaitHandle" : {
       "Type" : "AWS::CloudFormation::WaitConditionHandle"
     },
@@ -943,7 +947,7 @@
         "Handle" : {"Ref" : "CinderWaitHandle"},
         "Timeout" : "1200"
       }
-    },      
+    },
 
     "CinderIPAddress" : {
       "Type" : "AWS::EC2::EIP"
@@ -972,7 +976,7 @@
                     "mysql-server mysql-server/root_password_again password ", { "Ref" : "CinderMysqlRootPassword" }, "\n",
                     "mysql-server mysql-server/start_on_boot boolean true\n"
                   ]]},
-                  "mode"  : "000600",
+                  "mode" : "000600",
                   "owner" : "ubuntu",
                   "group" : "ubuntu"
                 },
@@ -981,7 +985,7 @@
                     "#!/bin/bash -v\n",
                     "debconf-set-selections < /opt/osonaws/tmp/all.preseed\n"
                   ]]},
-                  "mode"  : "000700",
+                  "mode" : "000700",
                   "owner" : "ubuntu",
                   "group" : "ubuntu"
                 }
@@ -995,7 +999,7 @@
             "setup_database" : {
               "packages" : {
                 "apt" : {
-                  "mysql-server"            : []
+                  "mysql-server" : []
                 }
               },
               "files" : {
@@ -1005,7 +1009,7 @@
                     "GRANT ALL ON cinder.* TO 'cinder'@'%' IDENTIFIED BY '", { "Ref" : "CinderMysqlUserPassword" }, "';\n",
                     "GRANT ALL ON cinder.* TO 'cinder'@'localhost' IDENTIFIED BY '", { "Ref" : "CinderMysqlUserPassword" }, "';\n"
                   ]]},
-                  "mode"  : "000600",
+                  "mode" : "000600",
                   "owner" : "ubuntu",
                   "group" : "ubuntu"
                 },
@@ -1014,7 +1018,7 @@
                     "#!/bin/bash -v\n",
                     "mysql -u root --password='", { "Ref" : "CinderMysqlRootPassword" }, "' < /opt/osonaws/setup.mysql\n"
                   ]]},
-                  "mode"  : "000700",
+                  "mode" : "000700",
                   "owner" : "ubuntu",
                   "group" : "ubuntu"
                 }
@@ -1028,25 +1032,27 @@
             "setup_cinder" : {
               "packages" : {
                 "apt" : {
-                  "cinder-api"            : [],
-                  "cinder-scheduler"      : [],
-                  "cinder-volume"         : [],
-                  "iscsitarget"           : [],
-                  "open-iscsi"            : [],
-                  "iscsitarget-dkms"      : [],
-                  "python-cinderclient"   : [],
-                  "python-mysqldb"        : [],
-                  "rabbitmq-server"       : []
+                  "cinder-api" : [],
+                  "cinder-scheduler" : [],
+                  "cinder-volume" : [],
+                  "iscsitarget" : [],
+                  "open-iscsi" : [],
+                  "iscsitarget-dkms" : [],
+                  "python-cinderclient" : [],
+                  "python-mysqldb" : []
                 }
               },
               "files" : {
                 "/opt/osonaws/setup_cinder" : {
                   "content" : { "Fn::Join" : ["", [
                     "#!/bin/bash -v\n",
-                    "rabbitmqctl change_password guest password\n",
+                      
                     "sed -i 's/\\*.conf/cinder_tgt.conf/g' /etc/tgt/targets.conf\n",
-                    "echo \"sql_connection = mysql://cinder:", { "Ref" : "CinderMysqlUserPassword" }, "@0.0.0.0:3306/cinder\n",
-                    "rabbit_password = password\" >> /etc/cinder/cinder.conf\n",
+                    "echo \"sql_connection = mysql://cinder:", { "Ref" : "CinderMysqlUserPassword" }, "@0.0.0.0:3306/cinder\" >> /etc/cinder/cinder.conf\n",
+                    
+                    "echo 'rabbit_host=", { "Ref" : "NovaIPAddress" }, "\n",
+                    "rabbit_password=", { "Ref" : "RabbitPassword" }, "\n",
+                    "scheduler_driver=nova.scheduler.simple.SimpleScheduler'  >> /etc/cinder/cinder.conf\n",
                     
                     "apt-get install linux-headers-`uname -r` -y\n",
                     "sed -i 's/false/true/g' /etc/default/iscsitarget\n",
@@ -1060,7 +1066,7 @@
                     "sed -i 's/service_host = 127.0.0.1/service_host =", { "Ref" : "KeystoneIPAddress" }, "/g' /etc/cinder/api-paste.ini\n",
                     "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/cinder/api-paste.ini\n",
                     "sed -i 's/%SERVICE_USER%/cinder/g' /etc/cinder/api-paste.ini\n",
-                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "KeystoneCinderUserPassword" }, "/g' /etc/cinder/api-paste.ini\n",    
+                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "KeystoneCinderUserPassword" }, "/g' /etc/cinder/api-paste.ini\n",
                      
                     "cinder-manage db sync\n",
                     "service cinder-api restart\n",
@@ -1068,7 +1074,7 @@
                     "service cinder-volume restart\n"
                      
                   ]]},
-                  "mode"  : "000700",
+                  "mode" : "000700",
                   "owner" : "ubuntu",
                   "group" : "ubuntu"
                 }
@@ -1093,7 +1099,7 @@
             "#! /bin/bash\n",
 
             "apt-get install ubuntu-cloud-keyring\n",
-            "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
+            "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' > /etc/apt/sources.list.d/cloud-archive.list\n",
             "echo 'APT::Get::AllowUnauthenticated \"true\";' >> /etc/apt/apt.conf.d/70debconf\n",
             "apt-get update\n",
             
@@ -1102,15 +1108,15 @@
             
             "function error_exit\n",
             "{\n",
-            "  cfn-signal -e 1 -r \"$1\" '", { "Ref" : "CinderWaitHandle" }, "'\n",
-            "  exit 1\n",
+            " cfn-signal -e 1 -r \"$1\" '", { "Ref" : "CinderWaitHandle" }, "'\n",
+            " exit 1\n",
             "}\n",
             
             "cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r CinderServer ",
-            "    --access-key ",  { "Ref" : "OpenStackUserAccessKey" },
-            "    --secret-key ", {"Fn::GetAtt": ["OpenStackUserAccessKey", "SecretAccessKey"]},
-            "    --region ", { "Ref" : "AWS::Region" }, 
-            "    --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
+            " --access-key ", { "Ref" : "OpenStackUserAccessKey" },
+            " --secret-key ", {"Fn::GetAtt": ["OpenStackUserAccessKey", "SecretAccessKey"]},
+            " --region ", { "Ref" : "AWS::Region" },
+            " --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
             "# All is well so signal success\n",
             
             "cfn-signal -e 0 -r \"Cinder setup complete\" '", { "Ref" : "CinderWaitHandle" }, "'\n"
@@ -1129,9 +1135,29 @@
   },
 
   "Outputs" : {
+    "NovaENV" : {
+      "Value" : { "Fn::Join" : ["", ["export OS_USERNAME=nova; export OS_PASSWORD=", { "Ref" : "KeystoneNovaUserPassword" }, "; export OS_TENANT_NAME=service; export OS_AUTH_URL=http://", { "Ref" : "KeystoneIPAddress" }, ":35357/v2.0; ; export OS_NO_CACHE=1" ]] },
+      "Description" : "Nova env (debug)"    
+    },
+    "GlanceENV" : {
+      "Value" : { "Fn::Join" : ["", ["export OS_USERNAME=glance; export OS_PASSWORD=", { "Ref" : "KeystoneGlanceUserPassword" }, "; export OS_TENANT_NAME=service; export OS_AUTH_URL=http://", { "Ref" : "KeystoneIPAddress" }, ":35357/v2.0" ]] },
+      "Description" : "Glance env (debug)"    
+    },
+    "CinderENV" : {
+      "Value" : { "Fn::Join" : ["", ["export OS_USERNAME=cinder; export OS_PASSWORD=", { "Ref" : "KeystoneCinderUserPassword" }, "; export OS_TENANT_NAME=service; export OS_AUTH_URL=http://", { "Ref" : "KeystoneIPAddress" }, ":35357/v2.0" ]] },
+      "Description" : "Cinder env (debug)"    
+    },
+    "keystoneENV" : {
+      "Value" : { "Fn::Join" : ["", ["export SERVICE_TOKEN='", { "Ref" : "KeystoneAdminToken" }, "; export SERVICE_ENDPOINT='http://0.0.0.0:35357/v2.0'" ]] },
+      "Description" : "Cinder env (debug)"    
+    },
     "SwiftEndPoint" : {
       "Value" : { "Fn::Join" : ["", ["swift -V 2.0 -A http://", { "Ref" : "KeystoneIPAddress" }, ":5000/v2.0 -U service:swift -K ", { "Ref" : "KeystoneSwiftUserPassword" }, " stat" ]] },
       "Description" : "Command to execute to test the cluster with swift client."    
+    },
+    "HorizonURL" : {
+      "Value" : { "Fn::Join" : ["", ["http://", { "Ref" : "KeystoneIPAddress" }, "/horizon" ]] },
+      "Description" : "Graphical interface URL"
     }
   }
 }
