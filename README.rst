@@ -12,7 +12,7 @@ Table of Contents
 ::
 
   0. What is it?
-  1. How to use?
+  1. Launch a stack?
 
 0. What is it?
 ==============
@@ -27,8 +27,21 @@ Status: Development
 1. How to use?
 ====================
 
-**Step 1:** Open your AWS console and go to CloudFormation tab.
+**Step 1:** Download openstack.template on GitHub.
 
-**Step 2:** Launch a new stack with openstack.template file.
 
-**Step 3:** Wait few minutes (~25m) and connect to OpenStack GUI via URL given in output tab of your stack.
+
+**Step 2:** Open your AWS console and go to CloudFormation tab.
+
+
+
+**Step 3:** Launch a new stack with openstack.template file.
+
+
+
+
+**Step 4:** Wait around 30 minutes and connect to OpenStack GUI via URL given in output tab of your stack.
+
+.. image:: http://s3-ap-southeast-1.amazonaws.com/osonaws/howto/createinprogress.png
+.. image:: http://s3-ap-southeast-1.amazonaws.com/osonaws/howto/createcomplete.png
+
