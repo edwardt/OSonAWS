@@ -12,7 +12,9 @@ Table of Contents
 ::
 
   0. What is it?
-  1. Launch a stack
+  1. Requirements
+  2. Launch a stack
+  3. Pricing (AWS fees)
 
 0. What is it?
 ==============
@@ -27,13 +29,16 @@ Status: Development
 1. How to use?
 ====================
 
-**Step 1:** Download openstack.template on GitHub.
+1.1. Download openstack.template on GitHub.
+-----------------
 
-**Step 2:** Open your AWS console and go to CloudFormation tab. Click "create new stack".
+1.2 Open your AWS console and go to CloudFormation tab. Click "create new stack".
+-----------------
 
 .. image:: http://s3-ap-southeast-1.amazonaws.com/osonaws/howto/createstack.png
 
-**Step 3:** Give your stack a name and load the template you downloaded on step 1. Then press continue.
+1.3 Give your stack a name and load the template you downloaded on step 1. Then press continue.
+-----------------
 
 .. image:: http://s3-ap-southeast-1.amazonaws.com/osonaws/howto/nameandtemplate.png
 
