@@ -37,6 +37,9 @@ http://docs.amazonwebservices.com/AWSEC2/latest/UserGuide/EC2_GetStarted.html
 2.1. Download openstack.template on GitHub.
 -----------------
 
+Open this URL in a browser and save the file (File > Save as) :
+https://raw.github.com/Capashen/OSonAWS/master/Openstack.template
+
 2.2 Open your AWS console and go to CloudFormation tab. Click "create new stack".
 -----------------
 
