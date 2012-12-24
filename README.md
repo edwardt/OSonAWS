@@ -1,17 +1,34 @@
-This project is experimental.
+==========================================================
+  OpenStack over Amazon Web Services
+==========================================================
+
+:Version: 0.1 Alpha
+:Keywords: Multi node OpenStack, Folsom, Quantum, Nova, Keystone, Glance, Horizon, Cinder, OpenVSwitch, KVM, Ubuntu Server 12.10 (64 bits).
+:Authors: Pierre FREUND <pierre.freund@gmail.com>
+
+Table of Contents
+=================
+
+::
+
+  0. What is it?
+  1. How to use?
+
+0. What is it?
+==============
 
 OSonAWS is a set of template to quickly deploy an OpenStack cloud on Amazon Web Services.
 
-If you want to deploy OpenStack on a single machine for development, you should see http://devstack.org.
+Version 0.1
 
-# Goals
+Status: Development 
 
-* To quickely build OpenStack environment with many servers, network and storage (like a swift cluster).
 
-BE CAREFUL : by default 5 EC2 instances (Keystone, SwiftProxy, 3x SwiftNodes) are launch with 3x1 Go EBS storage.
+1. How to use?
+====================
 
-# Start a QA Cloud
+**Step 1:** Open your AWS console and go to CloudFormation tab.
 
-Load swift template in AWS Cloudformation. 
+**Step 2:** Launch a new stack with openstack.template file.
 
-See the output and launch the command from a system with swift client installed.
+**Step 3:** Wait few minutes (~25m) and connect to OpenStack GUI via URL given in output tab of your stack.
