@@ -79,3 +79,11 @@ https://raw.github.com/Capashen/OSonAWS/master/Openstack.template
 2. Pricing
 ====================
 
+Default configuration :
+12 cores / 22,5 Go RAM / 100 Go DISK
+
+5 small instances : 0,065$ * 5 = 0,325 $
+3 large instances (compute) 0,260$ * 3 = 0,78 $
+
+Total : 1$ / hour
+
