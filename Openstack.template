@@ -43,7 +43,7 @@
       "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
     },
 
-    "KeystoneSwiftUserPassword": {
+    "ServicePassword": {
       "Default": "icXyuCaywR",
       "Description" : "Keystone swift user password",
       "Type": "String",
@@ -97,40 +97,10 @@
       "Type": "String"
     },
 
-    "KeystoneGlanceUserPassword": {
-      "Default": "icXyuCaywR",
-      "Description" : "Keystone Glance user password",
-      "Type": "String",
-      "MinLength": "1",
-      "MaxLength": "64",
-      "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
-      "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
-    },
-
-    "KeystoneCinderUserPassword": {
-      "Default": "icXyuCaywR",
-      "Description" : "Keystone Cinder user password",
-      "Type": "String",
-      "MinLength": "1",
-      "MaxLength": "64",
-      "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
-      "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
-    },
-
     "CinderVolumeSize": {
       "Default": "10",
       "Description" : "Size of cinder volume",
       "Type": "String"
-    },
-
-    "KeystoneNovaUserPassword": {
-      "Default": "icXyuCaywR",
-      "Description" : "Keystone Nova user password",
-      "Type": "String",
-      "MinLength": "1",
-      "MaxLength": "64",
-      "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
-      "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
     },
 
     "RabbitPassword": {
@@ -364,7 +334,9 @@
                       "sed -i \"s/# compute_port/compute_port/g\" /etc/keystone/keystone.conf\n",
                       "service mysql restart\n",
                       "service keystone restart\n",
-                      "keystone-manage db_sync\n"
+                      "keystone-manage db_sync\n",
+                      
+                      "echo 'source /opt/osonaws/keystonerc' >> /home/ubuntu/.bashrc\n"
                     ]]},
                     "mode"  : "000700",
                     "owner" : "ubuntu",
@@ -411,17 +383,17 @@
                       "keystone user-role-add --user-id $DEMO_USER --role-id $MEMBER_ROLE --tenant-id $INVIS_TENANT\n",
 
                       "# Configure service users/roles\n",
-                      "NOVA_USER=$(get_id keystone user-create --name=nova --pass=\"", { "Ref" : "KeystoneNovaUserPassword" }, "\" --tenant-id $SERVICE_TENANT --email=nova@domain.com)\n",
+                      "NOVA_USER=$(get_id keystone user-create --name=nova --pass=\"", { "Ref" : "ServicePassword" }, "\" --tenant-id $SERVICE_TENANT --email=nova@domain.com)\n",
                       "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $NOVA_USER --role-id $ADMIN_ROLE\n",
-                      "GLANCE_USER=$(get_id keystone user-create --name=glance --pass=\"", { "Ref" : "KeystoneGlanceUserPassword" }, "\" --tenant-id $SERVICE_TENANT --email=glance@domain.com)\n",
+                      "GLANCE_USER=$(get_id keystone user-create --name=glance --pass=\"", { "Ref" : "ServicePassword" }, "\" --tenant-id $SERVICE_TENANT --email=glance@domain.com)\n",
                       "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $GLANCE_USER --role-id $ADMIN_ROLE\n",
-                      "SWIFT_USER=$(get_id keystone user-create --name=swift --pass=\"", { "Ref" : "KeystoneSwiftUserPassword" }, "\" --tenant-id $SERVICE_TENANT --email=swift@example.com)\n",
+                      "SWIFT_USER=$(get_id keystone user-create --name=swift --pass=\"", { "Ref" : "ServicePassword" }, "\" --tenant-id $SERVICE_TENANT --email=swift@example.com)\n",
                       "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $SWIFT_USER --role-id $ADMIN_ROLE\n",
                       "RESELLER_ROLE=$(get_id keystone role-create --name=ResellerAdmin)\n",
                       "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $NOVA_USER --role-id $RESELLER_ROLE\n",
-                      "QUANTUM_USER=$(get_id keystone user-create --name=quantum --pass=\"$SERVICE_PASSWORD\" --tenant-id $SERVICE_TENANT --email=quantum@domain.com)\n",
+                      "QUANTUM_USER=$(get_id keystone user-create --name=quantum --pass=\"", { "Ref" : "ServicePassword" }, "\" --tenant-id $SERVICE_TENANT --email=quantum@domain.com)\n",
                       "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $QUANTUM_USER --role-id $ADMIN_ROLE\n",
-                      "CINDER_USER=$(get_id keystone user-create --name=cinder --pass=\"", { "Ref" : "KeystoneCinderUserPassword" }, "\" --tenant-id $SERVICE_TENANT --email=cinder@domain.com)\n",
+                      "CINDER_USER=$(get_id keystone user-create --name=cinder --pass=\"", { "Ref" : "ServicePassword" }, "\" --tenant-id $SERVICE_TENANT --email=cinder@domain.com)\n",
                       "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $CINDER_USER --role-id $ADMIN_ROLE\n",
 
                       "#Services creation\n",
@@ -438,7 +410,17 @@
                       "keystone endpoint-create --region RegionOne --service-id $CINDER_SERVICE --publicurl 'http:\/\/", { "Fn::GetAtt" : [ "CinderServer", "PrivateIp" ] }, ":8776\/v1\/%(tenant_id)s' --adminurl 'http:\/\/", { "Fn::GetAtt" : [ "CinderServer", "PrivateIp" ] }, ":8776\/v1\/%(tenant_id)s' --internalurl 'http:\/\/", { "Fn::GetAtt" : [ "CinderServer", "PrivateIp" ] }, ":8776\/v1\/%(tenant_id)s'\n",                  
                       "keystone endpoint-create --region RegionOne --service-id $KEYSTONE_SERVICE --publicurl 'http:\/\/", { "Ref" : "KeystoneIPAddress" }, ":5000/v2.0' --adminurl 'http:\/\/", { "Ref" : "KeystoneIPAddress" }, ":5000/v2.0' --internalurl 'http:\/\/", { "Ref" : "KeystoneIPAddress" }, ":5000/v2.0'\n",
                       "keystone endpoint-create --region RegionOne --service-id $NOVA_SERVICE --publicurl 'http:\/\/", { "Ref" : "NovaIPAddress" }, ":8774/v2/%(tenant_id)s' --adminurl 'http:\/\/", { "Ref" : "NovaIPAddress" }, ":8774/v2/%(tenant_id)s' --internalurl 'http:\/\/", { "Ref" : "NovaIPAddress" }, ":8774/v2/%(tenant_id)s'\n",
-                      "keystone endpoint-create --region RegionOne --service-id $EC2_SERVICE --publicurl 'http:\/\/", { "Ref" : "NovaIPAddress" }, ":8773/services/Cloud' --adminurl 'http:\/\/", { "Ref" : "NovaIPAddress" }, ":8773/services/Admin' --internalurl 'http:\/\/", { "Ref" : "NovaIPAddress" }, ":8773/services/Cloud'\n"
+                      "keystone endpoint-create --region RegionOne --service-id $EC2_SERVICE --publicurl 'http:\/\/", { "Ref" : "NovaIPAddress" }, ":8773/services/Cloud' --adminurl 'http:\/\/", { "Ref" : "NovaIPAddress" }, ":8773/services/Admin' --internalurl 'http:\/\/", { "Ref" : "NovaIPAddress" }, ":8773/services/Cloud'\n",
+                      "keystone endpoint-create --region RegionOne --service-id $QUANTUM_SERVICE --publicurl 'http:\/\/", { "Fn::GetAtt" : [ "QuantumServer", "PrivateIp" ] }, ":9696/' --adminurl 'http:\/\/", { "Fn::GetAtt" : [ "QuantumServer", "PrivateIp" ] }, ":9696/' --internalurl 'http:\/\/", { "Fn::GetAtt" : [ "QuantumServer", "PrivateIp" ] }, ":9696/'\n"
+                    ]]},
+                    "mode"  : "000700",
+                    "owner" : "ubuntu",
+                    "group" : "ubuntu"
+                  },
+                  "/opt/osonaws/keystonerc" : {
+                    "content" : { "Fn::Join" : ["", [
+                      "export SERVICE_TOKEN='", { "Ref" : "KeystoneAdminToken" }, "'\n",
+                      "export SERVICE_ENDPOINT='http://0.0.0.0:35357/v2.0'\n"
                     ]]},
                     "mode"  : "000700",
                     "owner" : "ubuntu",
@@ -629,17 +611,32 @@
                     "sed -i 's/auth_host = 127.0.0.1/auth_host =", { "Ref" : "KeystoneIPAddress" }, "/g' /etc/glance/glance-registry.conf\n",
                     "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/glance/glance-registry.conf\n",
                     "sed -i 's/%SERVICE_USER%/glance/g' /etc/glance/glance-registry.conf\n",
-                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "KeystoneGlanceUserPassword" }, "/g' /etc/glance/glance-registry.conf\n",
+                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "ServicePassword" }, "/g' /etc/glance/glance-registry.conf\n",
 
                     "sed -i \"s/sqlite:\\/\\/\\/\\/var\\/lib\\/glance\\/glance.sqlite\/mysql:\\/\\/glance:", { "Ref" : "MysqlUserPassword" }, "@0.0.0.0\\/glance\/g\" /etc/glance/glance-api.conf\n",
                     "sed -i 's/auth_host = 127.0.0.1/auth_host =", { "Ref" : "KeystoneIPAddress" }, "/g' /etc/glance/glance-api.conf\n",
                     "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/glance/glance-api.conf\n",
                     "sed -i 's/%SERVICE_USER%/glance/g' /etc/glance/glance-api.conf\n",
-                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "KeystoneGlanceUserPassword" }, "/g' /etc/glance/glance-api.conf\n",
+                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "ServicePassword" }, "/g' /etc/glance/glance-api.conf\n",
 
                     "service mysql restart\n",
                     "service glance-api restart && service glance-registry restart\n",
-                    "glance-manage db_sync\n"
+                    "glance-manage db_sync\n",
+                    
+                    "echo 'source /opt/osonaws/glancerc' >> /home/ubuntu/.bashrc\n",
+                    "source /opt/osonaws/glancerc\n",
+                    "glance image-create --location http://uec-images.ubuntu.com/releases/12.04/release/ubuntu-12.04-server-cloudimg-amd64-disk1.img --is-public true --disk-format qcow2 --container-format bare --name \"Ubuntu\"\n"
+                  ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                },
+                "/opt/osonaws/glancerc" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "export OS_USERNAME=glance\n",
+                    "export OS_PASSWORD=", { "Ref" : "ServicePassword" }, "\n",
+                    "export OS_TENANT_NAME=service\n",
+                    "export OS_AUTH_URL=http://", { "Ref" : "KeystoneIPAddress" }, ":35357/v2.0\n"
                   ]]},
                   "mode"  : "000700",
                   "owner" : "ubuntu",
@@ -721,7 +718,7 @@
         "Metadata" : {
           "AWS::CloudFormation::Init" : {
             "configSets" : {
-              "fullinstall" : [ "setup_seed", "setup_database", "setup_nova" ]
+              "fullinstall" : [ "setup_seed", "setup_database", "setup_nova", "setup_quantum" ]
              },
             "setup_seed" : {
               "files" : {
@@ -762,7 +759,10 @@
                   "content" : { "Fn::Join" : ["", [
                     "CREATE DATABASE nova;\n",
                     "GRANT ALL ON nova.* TO 'nova'@'%' IDENTIFIED BY '", { "Ref" : "MysqlUserPassword" }, "';\n",
-                    "GRANT ALL ON nova.* TO 'nova'@'localhost' IDENTIFIED BY '", { "Ref" : "MysqlUserPassword" }, "';\n"
+                    "GRANT ALL ON nova.* TO 'nova'@'localhost' IDENTIFIED BY '", { "Ref" : "MysqlUserPassword" }, "';\n",
+                    "CREATE DATABASE quantum;\n",
+                    "GRANT ALL ON quantum.* TO 'quantum'@'%' IDENTIFIED BY '", { "Ref" : "MysqlUserPassword" }, "';\n",
+                    "GRANT ALL ON quantum.* TO 'quantum'@'localhost' IDENTIFIED BY '", { "Ref" : "MysqlUserPassword" }, "';\n"
                   ]]},
                   "mode"  : "000600",
                   "owner" : "ubuntu",
@@ -815,13 +815,13 @@
                     "sed -i 's/service_host = 127.0.0.1/service_host =", { "Ref" : "KeystoneIPAddress" }, "/g' /etc/nova/api-paste.ini\n",
                     "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/nova/api-paste.ini\n",
                     "sed -i 's/%SERVICE_USER%/nova/g' /etc/nova/api-paste.ini\n",
-                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "KeystoneNovaUserPassword" }, "/g' /etc/nova/api-paste.ini\n",    
+                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "ServicePassword" }, "/g' /etc/nova/api-paste.ini\n",    
 
                     "echo \"\n",
                     "[DEFAULT]\n",
 
                     "# MySQL Connection #\n",
-                    "sql_connection=mysql://nova:", { "Ref" : "MysqlUserPassword" }, "@0.0.0.0/nova\n",
+                    "sql_connection=mysql://nova:", { "Ref" : "MysqlUserPassword" }, "@0.0.0.0:3306/nova\n",
 
                     "# nova-scheduler #\n",
                     "rabbit_host=", { "Ref" : "NovaIPAddress" }, "\n",
@@ -848,12 +848,12 @@
 
                     "# Networking #\n",
                     "network_api_class=nova.network.quantumv2.api.API\n",
-                    "quantum_url=http://", { "Ref" : "NovaIPAddress" }, ":9696\n",
+                    "quantum_url=http://", { "Fn::GetAtt" : [ "QuantumServer", "PrivateIp" ] }, ":9696\n",
                     "quantum_auth_strategy=keystone\n",
                     "quantum_admin_tenant_name=service\n",
                     "quantum_admin_username=quantum\n",
-                    "quantum_admin_password=password\n",
-                    "quantum_admin_auth_url=http://", { "Ref" : "NovaIPAddress" }, ":35357/v2.0\n",
+                    "quantum_admin_password=", { "Ref" : "ServicePassword" }, "\n",
+                    "quantum_admin_auth_url=http://", { "Fn::GetAtt" : [ "QuantumServer", "PrivateIp" ] }, ":35357/v2.0\n",
                     "libvirt_vif_driver=nova.virt.libvirt.vif.LibvirtHybridOVSBridgeDriver\n",
                     "linuxnet_interface_driver=nova.network.linux_net.LinuxOVSInterfaceDriver  \n",
                     "firewall_driver=nova.virt.libvirt.firewall.IptablesFirewallDriver\n",
@@ -884,17 +884,104 @@
                     "service nova-cert restart\n",
                     "service nova-consoleauth restart\n",
                     "service nova-scheduler restart\n",
-                    "service nova-novncproxy restart\n"
-
+                    "service nova-novncproxy restart\n",
+                    
+                    "echo 'source /opt/osonaws/novarc' >> /home/ubuntu/.bashrc\n"
                     ]]},
                   "mode"  : "000700",
                   "owner" : "ubuntu",
                   "group" : "ubuntu"
+                  },
+                  "/opt/osonaws/novarc" : {
+                    "content" : { "Fn::Join" : ["", [
+                      "export OS_USERNAME=nova\n",
+                      "export OS_PASSWORD=", { "Ref" : "ServicePassword" }, "\n",
+                      "export OS_TENANT_NAME=service\n",
+                      "export OS_AUTH_URL=http://", { "Ref" : "KeystoneIPAddress" }, ":35357/v2.0\n",
+                      "export OS_NO_CACHE=1\n"
+                    ]]},
+                    "mode"  : "000700",
+                    "owner" : "ubuntu",
+                    "group" : "ubuntu"
                   }
                 },
                 "commands" : {
-                  "01_setup_glance" : {
+                  "01_setup_nova" : {
                     "command" : "/opt/osonaws/setup_nova"
+                  }
+                }
+              },
+              "setup_quantum" : {
+                "packages" : {
+                  "apt" : {
+                    "openvswitch-switch"                  : [],
+                    "quantum-server"                      : [],
+                    "python-cliff"                        : [],
+                    "quantum-plugin-openvswitch-agent"    : [],
+                    "python-pyparsing"                    : []
+                  }
+                },
+                "files" : {
+                  "/etc/quantum/quantum.conf" : {
+                    "content" : { "Fn::Join" : ["", [
+                      "[DEFAULT]\n",
+                      "verbose = True\n",
+                      "debug = True\n",
+                      "bind_host = 0.0.0.0\n",
+                      "bind_port = 9696\n",
+                      "core_plugin = quantum.plugins.openvswitch.ovs_quantum_plugin.OVSQuantumPluginV2\n",
+                      "auth_strategy = keystone\n",
+                      "fake_rabbit = False\n",
+                      "rabbit_host = ", { "Ref" : "NovaIPAddress" }, "\n",
+                      "rabbit_password = ", { "Ref" : "RabbitPassword" }, "\n",
+                      "api_paste_config = /etc/quantum/api-paste.ini\n",
+                      "control_exchange = quantum\n",
+                      "notification_driver = quantum.openstack.common.notifier.list_notifier\n",
+                      "list_notifier_drivers = quantum.openstack.common.notifier.rabbit_notifier\n",
+                      "[QUOTAS]\n"
+                      ]]},
+                    "mode"  : "000700",
+                    "owner" : "ubuntu",
+                    "group" : "ubuntu"
+                  },
+                  "/etc/quantum/plugins/openvswitch/ovs_quantum_plugin.ini" : {
+                    "content" : { "Fn::Join" : ["", [
+                      "[DATABASE]\n",
+                      "sql_connection = mysql://quantum:", { "Ref" : "MysqlUserPassword" }, "@", { "Ref" : "NovaIPAddress" }, ":3306/quantum\n",
+                      "reconnect_interval = 2\n",
+                      "[OVS]\n",
+                      "tenant_network_type = gre\n",
+                      "tunnel_id_ranges = 1:1000\n",
+                      "enable_tunneling = True\n",
+                      "[AGENT]\n",
+                      "polling_interval = 2\n",
+                      "root_helper = sudo /usr/bin/quantum-rootwrap /etc/quantum/rootwrap.conf\n"
+                      ]]},
+                    "mode"  : "000700",
+                    "owner" : "ubuntu",
+                    "group" : "ubuntu"
+                  },
+                  "/opt/osonaws/setup_quantum" : {
+                    "content" : { "Fn::Join" : ["", [
+                      "#!/bin/bash -v\n",
+    
+                      "echo 'use_namespaces = False' > /etc/quantum/dhcp_agent.ini\n",
+                      "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/quantum/api-paste.ini\n",
+                      "sed -i 's/%SERVICE_USER%/quantum/g' /etc/quantum/api-paste.ini\n",
+                      "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "ServicePassword" }, "/g' /etc/quantum/api-paste.ini\n",
+                      
+                      "/etc/init.d/openvswitch-switch start\n",
+                      "service quantum-server restart\n",
+                      "service quantum-plugin-openvswitch-agent restart\n"
+                      ]]},
+                    "mode"  : "000700",
+                    "owner" : "ubuntu",
+                    "group" : "ubuntu"
+                  }
+                },
+                "commands" : {
+                  "01_setup_quantum" : {
+                    "command" : "/opt/osonaws/setup_quantum"
                   }
                 }
               }
@@ -967,13 +1054,13 @@
         "Metadata" : {
           "AWS::CloudFormation::Init" : {
             "configSets" : {
-              "fullinstall" : [ "setup_nova_node" ]
+              "fullinstall" : [ "setup_nova_node", "setup_quatum" ]
             },
             "setup_nova_node" : {
               "packages" : {
                 "apt" : {
                   "kvm"                      : [],
-                  "libvirt-bin"             : [],
+                  "libvirt-bin"              : [],
                   "pm-utils"                 : [],
                   "nova-api-metadata"        : [],
                   "nova-compute-kvm"         : []
@@ -1007,13 +1094,13 @@
                     "sed -i 's/service_host = 127.0.0.1/service_host =", { "Ref" : "KeystoneIPAddress" }, "/g' /etc/nova/api-paste.ini\n",
                     "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/nova/api-paste.ini\n",
                     "sed -i 's/%SERVICE_USER%/nova/g' /etc/nova/api-paste.ini\n",
-                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "KeystoneNovaUserPassword" }, "/g' /etc/nova/api-paste.ini\n",    
+                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "ServicePassword" }, "/g' /etc/nova/api-paste.ini\n",
 
                     "echo \"\n",
                     "[DEFAULT]\n",
 
                     "# MySQL Connection #\n",
-                    "sql_connection=mysql://nova:", { "Ref" : "MysqlUserPassword" }, "@", { "Ref" : "NovaIPAddress" }, "/nova\n",
+                    "sql_connection=mysql://nova:", { "Ref" : "MysqlUserPassword" }, "@", { "Ref" : "NovaIPAddress" }, ":3306/nova\n",
 
                     "# nova-scheduler #\n",
                     "rabbit_host=", { "Ref" : "NovaIPAddress" }, "\n",
@@ -1040,12 +1127,12 @@
 
                     "# Networking #\n",
                     "network_api_class=nova.network.quantumv2.api.API\n",
-                    "quantum_url=http://", { "Ref" : "NovaIPAddress" }, ":9696\n",
+                    "quantum_url=http://", { "Fn::GetAtt" : [ "QuantumServer", "PrivateIp" ] }, ":9696\n",
                     "quantum_auth_strategy=keystone\n",
                     "quantum_admin_tenant_name=service\n",
                     "quantum_admin_username=quantum\n",
-                    "quantum_admin_password=password\n",
-                    "quantum_admin_auth_url=http://", { "Ref" : "NovaIPAddress" }, ":35357/v2.0\n",
+                    "quantum_admin_password=", { "Ref" : "ServicePassword" }, "\n",
+                    "quantum_admin_auth_url=http://", { "Fn::GetAtt" : [ "QuantumServer", "PrivateIp" ] }, ":35357/v2.0\n",
                     "libvirt_vif_driver=nova.virt.libvirt.vif.LibvirtHybridOVSBridgeDriver\n",
                     "linuxnet_interface_driver=nova.network.linux_net.LinuxOVSInterfaceDriver  \n",
                     "firewall_driver=nova.virt.libvirt.firewall.IptablesFirewallDriver\n",
@@ -1074,8 +1161,22 @@
                     "verbose=true\" > /etc/nova/nova.conf\n",
 
                     "service nova-api-metadata restart\n",
-                    "service nova-compute restart\n"
+                    "service nova-compute restart\n",
+                    
+                    "echo 'source /opt/osonaws/novarc' >> /home/ubuntu/.bashrc\n"
                     ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                },
+                "/opt/osonaws/novarc" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "export OS_USERNAME=nova\n",
+                    "export OS_PASSWORD=", { "Ref" : "ServicePassword" }, "\n",
+                    "export OS_TENANT_NAME=service\n",
+                    "export OS_AUTH_URL=http://", { "Ref" : "KeystoneIPAddress" }, ":35357/v2.0\n",
+                    "export OS_NO_CACHE=1\n"
+                  ]]},
                   "mode"  : "000700",
                   "owner" : "ubuntu",
                   "group" : "ubuntu"
@@ -1087,6 +1188,79 @@
                 },
                 "02_setup_nova_node" : {
                   "command" : "/opt/osonaws/setup_novanode"
+                }
+              }
+            },
+            "setup_quantum" : {
+              "packages" : {
+                "apt" : {
+                  "quantum-plugin-openvswitch-agent"          : []
+                }
+              },
+              "files" : {
+                "/etc/quantum/quantum.conf" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "[DEFAULT]\n",
+                    "verbose = True\n",
+                    "debug = True\n",
+                    "bind_host = 0.0.0.0\n",
+                    "bind_port = 9696\n",
+                    "core_plugin = quantum.plugins.openvswitch.ovs_quantum_plugin.OVSQuantumPluginV2\n",
+                    "auth_strategy = keystone\n",
+                    "fake_rabbit = False\n",
+                    "rabbit_host = ", { "Ref" : "NovaIPAddress" }, "\n",
+                    "rabbit_password = ", { "Ref" : "RabbitPassword" }, "\n",
+                    "api_paste_config = /etc/quantum/api-paste.ini\n",
+                    "control_exchange = quantum\n",
+                    "notification_driver = quantum.openstack.common.notifier.list_notifier\n",
+                    "list_notifier_drivers = quantum.openstack.common.notifier.rabbit_notifier\n",
+                    "[QUOTAS]\n"
+                    ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                },
+                "/etc/quantum/plugins/openvswitch/ovs_quantum_plugin.ini" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "[DATABASE]\n",
+                    "sql_connection = mysql://quantum:", { "Ref" : "MysqlUserPassword" }, "@", { "Ref" : "NovaIPAddress" }, ":3306/quantum\n",
+                    "reconnect_interval = 2\n",
+                    "[OVS]\n",
+                    "tenant_network_type = gre\n",
+                    "tunnel_id_ranges = 1:1000\n",
+                    "integration_bridge = br-int\n",
+                    "tunnel_bridge = br-tun\n",
+                    "local_ip = ", { "Ref" : "NovaNodeIPAddress" }, "\n",
+                    "enable_tunneling = True\n",
+                    "[AGENT]\n",
+                    "polling_interval = 2\n",
+                    "root_helper = sudo /usr/bin/quantum-rootwrap /etc/quantum/rootwrap.conf\n"
+                    ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                },
+                "/opt/osonaws/setup_quantum" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -v\n",
+
+                    "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/quantum/api-paste.ini\n",
+                    "sed -i 's/%SERVICE_USER%/quantum/g' /etc/quantum/api-paste.ini\n",
+                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "ServicePassword" }, "/g' /etc/quantum/api-paste.ini\n",
+                    
+                    "/etc/init.d/openvswitch-switch start\n",
+                    "ovs-vsctl add-br br-int\n",
+                    "restart quantum-plugin-openvswitch-agent\n",
+                    "service quantum-plugin-openvswitch-agent restart\n"
+                    ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                }
+              },
+              "commands" : {
+                "01_setup_quantum" : {
+                  "command" : "/opt/osonaws/setup_quantum"
                 }
               }
             }
@@ -1246,21 +1420,33 @@
                     "sed -i 's/service_host = 127.0.0.1/service_host = ", { "Ref" : "KeystoneIPAddress" }, "/g' /etc/cinder/api-paste.ini\n",
                     "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/cinder/api-paste.ini\n",
                     "sed -i 's/%SERVICE_USER%/cinder/g' /etc/cinder/api-paste.ini\n",
-                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "KeystoneCinderUserPassword" }, "/g' /etc/cinder/api-paste.ini\n",
+                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "ServicePassword" }, "/g' /etc/cinder/api-paste.ini\n",
 
                     "cinder-manage db sync\n",
                     "service cinder-api restart\n",
                     "service cinder-scheduler restart\n",
-                    "service cinder-volume restart\n"
+                    "service cinder-volume restart\n",
 
+                    "echo 'source /opt/osonaws/cinderrc' >> /home/ubuntu/.bashrc\n"
                   ]]},
                   "mode" : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                },
+                "/opt/osonaws/cinderrc" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "export OS_USERNAME=cinder\n",
+                    "export OS_PASSWORD=", { "Ref" : "ServicePassword" }, "\n",
+                    "export OS_TENANT_NAME=service\n",
+                    "export OS_AUTH_URL=http://", { "Ref" : "KeystoneIPAddress" }, ":35357/v2.0\n"
+                  ]]},
+                  "mode"  : "000700",
                   "owner" : "ubuntu",
                   "group" : "ubuntu"
                 }
               },
               "commands" : {
-                "01_setup_glance" : {
+                "01_setup_cinder" : {
                   "command" : "/opt/osonaws/setup_cinder"
                 }
               }
@@ -1311,6 +1497,179 @@
         "Size" : {"Ref" : "CinderVolumeSize"},
         "AvailabilityZone" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AZ" ] }
       }
+    },
+
+    "QuantumWaitHandle" : {
+      "Type" : "AWS::CloudFormation::WaitConditionHandle"
+    },
+
+    "QuantumWaitCondition" : {
+      "Type" : "AWS::CloudFormation::WaitCondition",
+      "DependsOn" : "QuantumServer",
+      "Properties" : {
+        "Handle" : {"Ref" : "QuantumWaitHandle"},
+        "Timeout" : "1200"
+      }
+    },
+
+    "QuantumServer": {
+      "Type": "AWS::EC2::Instance",
+        "Metadata" : {
+          "AWS::CloudFormation::Init" : {
+            "configSets" : {
+              "fullinstall" : [ "setup_quantum" ]
+             },
+            "setup_quantum" : {
+              "packages" : {
+                "apt" : {
+                  "quantum-plugin-openvswitch-agent"        : [],
+                  "quantum-dhcp-agent"                      : [],
+                  "quantum-l3-agent"                        : []
+                }
+              },
+              "files" : {
+                "/etc/quantum/quantum.conf" : {
+                    "content" : { "Fn::Join" : ["", [
+                      "[DEFAULT]\n",
+                      "verbose = True\n",
+                      "debug = True\n",
+                      "bind_host = 0.0.0.0\n",
+                      "bind_port = 9696\n",
+                      "core_plugin = quantum.plugins.openvswitch.ovs_quantum_plugin.OVSQuantumPluginV2\n",
+                      "auth_strategy = keystone\n",
+                      "fake_rabbit = False\n",
+                      "rabbit_host = ", { "Ref" : "NovaIPAddress" }, "\n",
+                      "rabbit_password = ", { "Ref" : "RabbitPassword" }, "\n",
+                      "api_paste_config = /etc/quantum/api-paste.ini\n",
+                      "control_exchange = quantum\n",
+                      "notification_driver = quantum.openstack.common.notifier.list_notifier\n",
+                      "list_notifier_drivers = quantum.openstack.common.notifier.rabbit_notifier\n",
+                      "[QUOTAS]\n"
+                      ]]},
+                    "mode"  : "000700",
+                    "owner" : "ubuntu",
+                    "group" : "ubuntu"
+                  },
+                  "/etc/quantum/plugins/openvswitch/ovs_quantum_plugin.ini" : {
+                    "content" : { "Fn::Join" : ["", [
+                      "[DATABASE]\n",
+                      "sql_connection = mysql://quantum:", { "Ref" : "MysqlUserPassword" }, "@", { "Ref" : "NovaIPAddress" }, ":3306/quantum\n",
+                      "reconnect_interval = 2\n",
+                      "[OVS]\n",
+                      "tenant_network_type = gre \n",
+                      "tunnel_id_ranges = 1:1000\n",
+                      "enable_tunneling = True\n",
+                      "integration_bridge = br-int\n",
+                      "tunnel_bridge = br-tun\n",
+                      "local_ip = \n",
+                      "[AGENT]\n",
+                      "polling_interval = 2\n",
+                      "root_helper = sudo /usr/bin/quantum-rootwrap /etc/quantum/rootwrap.conf\n"
+                      ]]},
+                    "mode"  : "000700",
+                    "owner" : "ubuntu",
+                    "group" : "ubuntu"
+                  },
+                  "/opt/osonaws/setup_quantum" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -v\n",
+
+                    "apt-get autoremove openvswitch-datapath-dkms -y\n",
+                    "kernel_version=`cat /proc/version | cut -d \" \" -f3`\n",
+                    "apt-get install -y make fakeroot dkms openvswitch-switch openvswitch-datapath-dkms linux-headers-$kernel_version\n",
+                    "/etc/init.d/openvswitch-switch restart\n",
+                    
+                    "ovs-vsctl add-br br-int\n",
+                    "ovs-vsctl add-br br-ex\n",
+                    "ovs-vsctl add-port br-ex eth0\n",
+                    "ip link set up br-ex \n",
+
+                    "sed -i 's/auth_host = 127.0.0.1/auth_host =", { "Ref" : "KeystoneIPAddress" }, "/g' /etc/quantum/api-paste.ini\n",
+                    "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/quantum/api-paste.ini\n",
+                    "sed -i 's/%SERVICE_USER%/quantum/g' /etc/quantum/api-paste.ini\n",
+                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "ServicePassword" }, "/g' /etc/quantum/api-paste.ini\n",
+                    
+                    "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/quantum/l3_agent.ini\n",
+                    "sed -i 's/%SERVICE_USER%/quantum/g' /etc/quantum/l3_agent.ini\n",
+                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "ServicePassword" }, "/g' /etc/quantum/l3_agent.ini\n",
+                    "echo 'metadata_ip = ", { "Ref" : "KeystoneIPAddress" }, "\n",
+                    "use_namespaces=False'\n",
+
+                    "echo 'use_namespaces = False' > /etc/quantum/dhcp_agent.ini\n",
+
+                    "service quantum-plugin-openvswitch-agent restart\n",
+                    "service quantum-dhcp-agent restart\n",
+                    "service quantum-l3-agent restart\n",
+                    
+                    "wget http://raw.github.com/EmilienM/openstack-folsom-guide/master/scripts/quantum-networking.sh\n",
+                    "chmod +x ./quantum-networking.sh\n",
+                    "export OS_USERNAME=quantum; export OS_PASSWORD=", { "Ref" : "ServicePassword" }, "\n",
+                    "export OS_TENANT_NAME=service\n",
+                    "export OS_AUTH_URL=http://", { "Ref" : "KeystoneIPAddress" }, ":35357/v2.0\n",
+                    "./quantum-networking.sh\n",
+                    
+                    "quantum net-list\n",
+                    "gateway_external_net_id = ID\n",
+                    "quantum router-list\n",
+                    "router_id = ID\n",
+                    "service quantum-l3-agent restart\n",
+
+                    "echo 'source /opt/osonaws/quantumrc' >> /home/ubuntu/.bashrc\n"
+                  ]]},
+                  "mode" : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                },
+                "/opt/osonaws/quantumrc" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "export OS_USERNAME=quantum\n",
+                    "export OS_PASSWORD=", { "Ref" : "ServicePassword" }, "\n",
+                    "export OS_TENANT_NAME=service\n",
+                    "export OS_AUTH_URL=http://", { "Ref" : "KeystoneIPAddress" }, ":35357/v2.0\n"
+                  ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                }
+              }
+            }
+          }
+        },
+        "Properties" : {
+          "KeyName" : { "Ref" : "KeyName" },
+          "InstanceType": { "Ref": "InstanceType" },
+          "ImageId" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AMI" ] },
+          "AvailabilityZone" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AZ" ] },
+          "SecurityGroups" : [ {"Ref" : "OpenStackSecurityGroup"} ],
+          "Monitoring" : "false",
+          "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
+            "#! /bin/bash\n",
+
+            "apt-get install ubuntu-cloud-keyring\n",
+            "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' > /etc/apt/sources.list.d/cloud-archive.list\n",
+            "echo 'APT::Get::AllowUnauthenticated \"true\";' >> /etc/apt/apt.conf.d/70debconf\n",
+            "apt-get update\n",
+
+            "apt-get -y install python-setuptools\n",
+            "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",
+
+            "function error_exit\n",
+            "{\n",
+            " cfn-signal -e 1 -r \"$1\" '", { "Ref" : "QuantumWaitHandle" }, "'\n",
+            " exit 1\n",
+            "}\n",
+
+            "cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r QuantumServer ",
+            " --access-key ", { "Ref" : "OpenStackUserAccessKey" },
+            " --secret-key ", {"Fn::GetAtt": ["OpenStackUserAccessKey", "SecretAccessKey"]},
+            " --region ", { "Ref" : "AWS::Region" },
+            " --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
+            "# All is well so signal success\n",
+
+            "cfn-signal -e 0 -r \"Quantum setup complete\" '", { "Ref" : "QuantumWaitHandle" }, "'\n"
+          ]]}
+        }
+      }
     }
   },
 
@@ -1319,41 +1678,25 @@
       "Value" : { "Fn::Join" : ["", ["http://", { "Ref" : "KeystoneIPAddress" }, "/horizon" ]] },
       "Description" : "Graphical interface URL"
     },
-    "NovaENV" : {
-      "Value" : { "Fn::Join" : ["", ["export OS_USERNAME=nova; export OS_PASSWORD=", { "Ref" : "KeystoneNovaUserPassword" }, "; export OS_TENANT_NAME=service; export OS_AUTH_URL=http://", { "Ref" : "KeystoneIPAddress" }, ":35357/v2.0; ; export OS_NO_CACHE=1" ]] },
-      "Description" : "Nova env (debug)"    
+    "QuantumIP" : {
+      "Value" : { "Fn::GetAtt" : [ "QuantumServer", "PublicIp" ] },
+      "Description" : "Quantum public IP (debug)"    
     },
     "NovaIP" : {
       "Value" : { "Fn::GetAtt" : [ "NovaServer", "PublicIp" ] },
       "Description" : "Glance public IP (debug)"    
     },
-    "GlanceENV" : {
-      "Value" : { "Fn::Join" : ["", ["export OS_USERNAME=glance; export OS_PASSWORD=", { "Ref" : "KeystoneGlanceUserPassword" }, "; export OS_TENANT_NAME=service; export OS_AUTH_URL=http://", { "Ref" : "KeystoneIPAddress" }, ":35357/v2.0" ]] },
-      "Description" : "Glance env (debug)"    
-    },
     "GlanceIP" : {
       "Value" : { "Fn::GetAtt" : [ "GlanceServer", "PublicIp" ] },
       "Description" : "Glance public IP (debug)"    
-    },
-    "CinderENV" : {
-      "Value" : { "Fn::Join" : ["", ["export OS_USERNAME=cinder; export OS_PASSWORD=", { "Ref" : "KeystoneCinderUserPassword" }, "; export OS_TENANT_NAME=service; export OS_AUTH_URL=http://", { "Ref" : "KeystoneIPAddress" }, ":35357/v2.0" ]] },
-      "Description" : "Cinder env (debug)"    
     },
     "CinderIP" : {
       "Value" : { "Fn::GetAtt" : [ "CinderServer", "PublicIp" ] },
       "Description" : "Cinder public IP (debug)"    
     },
-    "keystoneENV" : {
-      "Value" : { "Fn::Join" : ["", ["export SERVICE_TOKEN='", { "Ref" : "KeystoneAdminToken" }, "'; export SERVICE_ENDPOINT='http://0.0.0.0:35357/v2.0'" ]] },
-      "Description" : "Cinder env (debug)"    
-    },
     "KeystoneIP" : {
       "Value" : { "Fn::GetAtt" : [ "KeystoneServer", "PublicIp" ] },
       "Description" : "Keystone public IP (debug)"    
-    },
-    "SwiftEndPoint" : {
-      "Value" : { "Fn::Join" : ["", ["swift -V 2.0 -A http://", { "Ref" : "KeystoneIPAddress" }, ":5000/v2.0 -U service:swift -K ", { "Ref" : "KeystoneSwiftUserPassword" }, " stat" ]] },
-      "Description" : "Command to execute to test the cluster with swift client."    
     }
   }
 }

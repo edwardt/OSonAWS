@@ -28,7 +28,7 @@ You can also add a swift cluster with the number of nodes and storage you want.
 
 .. image:: http://s3-ap-southeast-1.amazonaws.com/osonaws/howto/schema.png
 
-1. Requirments
+1. Requirements
 ====================
 
 To use OSonAWS, you need to have a valid account on AWS and a keypair on EC2 service. If you don't, please fallow AWS Getting Started webpage :
@@ -41,6 +41,7 @@ http://docs.amazonwebservices.com/AWSEC2/latest/UserGuide/EC2_GetStarted.html
 -----------------
 
 Open this URL in a browser and save the file (File > Save as) :
+
 https://raw.github.com/Capashen/OSonAWS/master/Openstack.template
 
 2.2 Open your AWS console and go to CloudFormation tab. Click "create new stack".
@@ -74,3 +75,7 @@ https://raw.github.com/Capashen/OSonAWS/master/Openstack.template
 -----------------
 
 .. image:: http://s3-ap-southeast-1.amazonaws.com/osonaws/howto/login.png
+
+2. Pricing
+====================
+
