@@ -2,8 +2,8 @@
   OpenStack over Amazon Web Services
 ==========================================================
 
-:Version: 0.1 Alpha
-:Keywords: Multi node OpenStack, Folsom, Quantum, Nova, Keystone, Glance, Horizon, Cinder, OpenVSwitch, KVM, Ubuntu Server 12.10 (64 bits).
+:Version: 0.1 
+:Keywords: Multi node OpenStack, Folsom, Quantum, Nova, Keystone, Glance, Horizon, Cinder, OpenVSwitch, KVM, Ubuntu Server 12.04 (64 bits).
 :Authors: Pierre FREUND <pierre.freund@gmail.com>
 
 Table of Contents
