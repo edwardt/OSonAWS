@@ -4,77 +4,34 @@
 
 :Version: 0.1 
 :Keywords: Multi node OpenStack, Folsom, Quantum, Nova, Keystone, Glance, Horizon, Cinder, OpenVSwitch, KVM, Ubuntu Server 12.04 (64 bits).
-:Authors: Pierre FREUND <pierre.freund@gmail.com>
+:Launchpad: https://launchpad.net/osonaws
+:Status: Development
 
 Table of Contents
 =================
 
 ::
 
-  0. What is it?
-  1. Requirements
-  2. Launch a stack
-  3. Pricing (AWS fees)
+  1. What is it?
+  2. Pricing (AWS fees)
+  3. Development rules
+  4. Credits
 
-0. What is it?
+  
+Authors
+==========
+
+Copyright (C) Pierre FREUND <pierre.freund@gmail.com>
+
+1. What is it?
 ==============
 
 OSonAWS is a set of template to quickly deploy an OpenStack cloud on Amazon Web Services.
-Version 0.1
-Status: Development 
 
 OSonAWS launch a stack with minimum 7 servers according to the fallowing schema. You can choose when you launch the stack the amount of storage and the number/power of Nova nodes.
 You can also add a swift cluster with the number of nodes and storage you want.
 
 .. image:: http://s3-ap-southeast-1.amazonaws.com/osonaws/howto/schema.png
-
-1. Requirements
-====================
-
-To use OSonAWS, you need to have a valid account on AWS and a keypair on EC2 service. If you don't, please fallow AWS Getting Started webpage :
-http://docs.amazonwebservices.com/AWSEC2/latest/UserGuide/EC2_GetStarted.html
-
-2. How to use?
-====================
-
-2.1. Download openstack.template on GitHub.
------------------
-
-Open this URL in a browser and save the file (File > Save as) :
-
-https://raw.github.com/Capashen/OSonAWS/master/Openstack.template
-
-2.2 Open your AWS console and go to CloudFormation tab. Click "create new stack".
------------------
-
-.. image:: http://s3-ap-southeast-1.amazonaws.com/osonaws/howto/createstack.png
-
-2.3 Give your stack a name and load the template you downloaded on step 1. Then press continue.
------------------
-
-.. image:: http://s3-ap-southeast-1.amazonaws.com/osonaws/howto/nameandtemplate.png
-
-2.4 Find in the parameter list "Keyname" and give a the name of one of your EC2 keys. Check in the IAM ressource validation. Then press continue until the end.
------------------
-
-.. image:: http://s3-ap-southeast-1.amazonaws.com/osonaws/howto/keynameIAM.png
-
-2.5 Wait around 30 minutes and connect to OpenStack GUI via URL given in output tab of your stack.
------------------
-
-.. image:: http://s3-ap-southeast-1.amazonaws.com/osonaws/howto/createinprogress.png
-
-.. image:: http://s3-ap-southeast-1.amazonaws.com/osonaws/howto/createcomplete.png
-
-2.6 Click in "outputs" tab and click on the URL : "Horizon URL".
------------------
-
-.. image:: http://s3-ap-southeast-1.amazonaws.com/osonaws/howto/output.png
-
-2.7 Connect on the dashboard with admin/password, or demo/password. Note that you can change demo login and passwords in the template parameters.
------------------
-
-.. image:: http://s3-ap-southeast-1.amazonaws.com/osonaws/howto/login.png
 
 2. Pricing
 ====================
@@ -87,3 +44,17 @@ Default configuration :
 
 Total : 1$ / hour
 
+3. Development rules
+====================
+
+* Only 1 file for launching a stack. No external files used in the template (wget, file section, etc)
+* No specific AMI. Only use Ubuntu 12.04.1 LTS AMI.
+
+4. Credits
+=================
+
+This work has been based on:
+
+* Emilien Macchi's Folsom guide [https://github.com/EmilienM/openstack-folsom-guide]
+* OpenStack Documentation [http://docs.openstack.org/trunk/openstack-compute/install/apt/content/]
+* OpenStack Quantum Install [http://docs.openstack.org/trunk/openstack-network/admin/content/ch_install.html]
