@@ -253,6 +253,23 @@
       }
     },
 
+    "SubnetPublic" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+        "VpcId" : { "Ref" : "OpenStackVPC" },
+        "CidrBlock" : "10.0.1.0/24",
+        "AvailabilityZone" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AZ" ] },
+        "Tags" : [{
+          "Key" : "Application",
+          "Value" : { "Ref" : "AWS::StackName"}
+        },
+        {
+          "Key" : "Role",
+          "Value" : "Public"
+        }]
+      }
+    },
+
     "SubnetData" : {
       "Type" : "AWS::EC2::Subnet",
       "Properties" : {
@@ -269,14 +286,14 @@
         }]
       }
     },
-    
+
     "InternetGateway" : {
       "Type" : "AWS::EC2::InternetGateway",
       "Properties" : {
         "Tags" : [ {"Key" : "Application", "Value" : { "Ref" : "AWS::StackName"} } ]
       }
     },
-    
+
     "AttachGateway" : {
        "Type" : "AWS::EC2::VPCGatewayAttachment",
        "Properties" : {
@@ -284,7 +301,7 @@
          "InternetGatewayId" : { "Ref" : "InternetGateway" }
        }
     },
-    
+
     "RouteTable" : {
       "Type" : "AWS::EC2::RouteTable",
       "Properties" : {
@@ -301,15 +318,15 @@
         "GatewayId" : { "Ref" : "InternetGateway" }
       }
     },
-    
+
     "SubnetRouteTableAssociation" : {
       "Type" : "AWS::EC2::SubnetRouteTableAssociation",
       "Properties" : {
-        "SubnetId" : { "Ref" : "SubnetManagement" },
+        "SubnetId" : { "Ref" : "SubnetPublic" },
         "RouteTableId" : { "Ref" : "RouteTable" }
       }
     },
-    
+
     "NetworkAcl" : {
       "Type" : "AWS::EC2::NetworkAcl",
       "Properties" : {
@@ -317,7 +334,7 @@
         "Tags" : [ {"Key" : "Application", "Value" : { "Ref" : "AWS::StackName"} } ]
       }
     },
-    
+
     "InboundHTTPNetworkAclEntry" : {
       "Type" : "AWS::EC2::NetworkAclEntry",
       "Properties" : {
@@ -330,7 +347,7 @@
         "PortRange" : {"From" : "0", "To" : "65535"}
       }
     },
-    
+
     "OutBoundHTTPNetworkAclEntry" : {
       "Type" : "AWS::EC2::NetworkAclEntry",
       "Properties" : {
@@ -343,7 +360,7 @@
         "PortRange" : {"From" : "0", "To" : "65535"}
       }
     },
-    
+
     "SubnetNetworkAclAssociation" : {
       "Type" : "AWS::EC2::SubnetNetworkAclAssociation",
       "Properties" : {
@@ -351,7 +368,15 @@
         "NetworkAclId" : { "Ref" : "NetworkAcl" }
       }
     },
-    
+
+    "SubnetNetworkAclAssociationPublic" : {
+      "Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+      "Properties" : {
+        "SubnetId" : { "Ref" : "SubnetPublic" },
+        "NetworkAclId" : { "Ref" : "NetworkAcl" }
+      }
+    },
+
     "SubnetNetworkAclAssociationData" : {
       "Type" : "AWS::EC2::SubnetNetworkAclAssociation",
       "Properties" : {
@@ -382,7 +407,7 @@
       "Type" : "AWS::EC2::EIPAssociation",
       "Properties" : {
         "AllocationId" : { "Fn::GetAtt": ["KeystoneIPAddress", "AllocationId"]},
-        "NetworkInterfaceId" : { "Ref" : "KeystoneInterfaceManagement" }
+        "NetworkInterfaceId" : { "Ref" : "KeystoneInterfacePublic" }
       }
     },
 
@@ -390,7 +415,7 @@
       "Type" : "AWS::EC2::NetworkInterface",
       "Properties" : {
         "Description": "Public network interface",
-        "PrivateIpAddress": "10.0.0.200",
+        "PrivateIpAddress": "10.0.1.10",
         "SubnetId": { "Ref" : "SubnetManagement" },
         "GroupSet": [{ "Ref" : "OpenStackSecurityGroup" }]
       }
@@ -653,12 +678,10 @@
             "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
                "#! /bin/bash\n",
 
-              "echo \"auto eth1\n",
-              "iface eth1 inet static\n",
-              "  address 10.0.0.200\n",
-              "  network 10.0.0.0\n",
-              "  netmask 255.255.255.0\" >> /etc/network/interfaces\n",
-              "ifup eth1\n",
+               "echo \"auto eth1\n",
+               "iface eth1 inet dhcp\" >> /etc/network/interfaces\n",
+               "ifup eth1\n",
+               "route add default gw 10.0.1.1 eth1\n",
                
                "apt-get install ubuntu-cloud-keyring\n",
                "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
@@ -709,7 +732,7 @@
       "Type" : "AWS::EC2::EIPAssociation",
       "Properties" : {
         "AllocationId" : { "Fn::GetAtt": ["CinderIPAddress", "AllocationId"]},
-        "NetworkInterfaceId" : { "Ref" : "CinderInterfaceManagement" }
+        "NetworkInterfaceId" : { "Ref" : "CinderInterfacePublic" }
       }
     },
 
@@ -717,7 +740,7 @@
       "Type" : "AWS::EC2::NetworkInterface",
       "Properties" : {
         "Description": "Public network interface",
-        "PrivateIpAddress": "10.0.0.201",
+        "PrivateIpAddress": "10.0.1.11",
         "SubnetId": { "Ref" : "SubnetManagement" },
         "GroupSet": [{ "Ref" : "OpenStackSecurityGroup" }]
       }
@@ -891,11 +914,9 @@
             "#! /bin/bash\n",
 
             "echo \"auto eth1\n",
-            "iface eth1 inet static\n",
-            "  address 10.0.0.201\n",
-            "  network 10.0.0.0\n",
-            "  netmask 255.255.255.0\" >> /etc/network/interfaces\n",
-            "ifup eth1\n",  
+            "iface eth1 inet dhcp\" >> /etc/network/interfaces\n",
+            "ifup eth1\n",
+            "route add default gw 10.0.1.1 eth1\n",
 
             "apt-get install ubuntu-cloud-keyring\n",
             "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' > /etc/apt/sources.list.d/cloud-archive.list\n",
@@ -923,7 +944,7 @@
         }
       }
     },
-    
+
     "CinderVolume" : {
       "Type" : "AWS::EC2::Volume",
       "Properties" : {
@@ -931,7 +952,7 @@
         "AvailabilityZone" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AZ" ] }
       }
     },
-    
+
     "GlanceIPAddress" : {
       "Type" : "AWS::EC2::EIP",
       "Properties" : {"Domain" : "vpc"}
@@ -941,7 +962,7 @@
       "Type" : "AWS::EC2::EIPAssociation",
       "Properties" : {
         "AllocationId" : { "Fn::GetAtt": ["GlanceIPAddress", "AllocationId"]},
-        "NetworkInterfaceId" : { "Ref" : "GlanceInterfaceManagement" }
+        "NetworkInterfaceId" : { "Ref" : "GlanceInterfacePublic" }
       }
     },
 
@@ -949,7 +970,7 @@
       "Type" : "AWS::EC2::NetworkInterface",
       "Properties" : {
         "Description": "Public network interface",
-        "PrivateIpAddress": "10.0.0.202",
+        "PrivateIpAddress": "10.0.1.12",
         "SubnetId": { "Ref" : "SubnetManagement" },
         "GroupSet": [{ "Ref" : "OpenStackSecurityGroup" }]
       }
@@ -1126,11 +1147,9 @@
             "#! /bin/bash\n",
 
             "echo \"auto eth1\n",
-            "iface eth1 inet static\n",
-            "  address 10.0.0.202\n",
-            "  network 10.0.0.0\n",
-            "  netmask 255.255.255.0\" >> /etc/network/interfaces\n",
-            "ifup eth1\n",  
+            "iface eth1 inet dhcp\" >> /etc/network/interfaces\n",
+            "ifup eth1\n",
+            "route add default gw 10.0.1.1 eth1\n",
 
             "apt-get install ubuntu-cloud-keyring\n",
             "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
@@ -1510,11 +1529,9 @@
               "#! /bin/bash\n",
 
               "echo \"auto eth1\n",
-              "iface eth1 inet static\n",
-              "  address 10.0.0.204\n",
-              "  network 10.0.0.0\n",
-              "  netmask 255.255.255.0\" >> /etc/network/interfaces\n",
+              "iface eth1 inet dhcp\" >> /etc/network/interfaces\n",
               "ifup eth1\n",
+              "route add default gw 10.0.1.1 eth1\n",
 
               "apt-get install ubuntu-cloud-keyring\n",
               "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
@@ -1565,7 +1582,7 @@
       "Type" : "AWS::EC2::EIPAssociation",
       "Properties" : {
         "AllocationId" : { "Fn::GetAtt": ["NovaNodeIPAddress", "AllocationId"]},
-        "NetworkInterfaceId" : { "Ref" : "NovaNodeInterfaceManagement" }
+        "NetworkInterfaceId" : { "Ref" : "NovaNodeInterfacePublic" }
       }
     },
 
@@ -1573,7 +1590,7 @@
       "Type" : "AWS::EC2::NetworkInterface",
       "Properties" : {
         "Description": "Public network interface",
-        "PrivateIpAddress": "10.0.0.205",
+        "PrivateIpAddress": "10.0.1.15",
         "SubnetId": { "Ref" : "SubnetManagement" },
         "GroupSet": [{ "Ref" : "OpenStackSecurityGroup" }]
       }
@@ -1847,11 +1864,9 @@
             "#! /bin/bash\n",
 
             "echo \"auto eth1\n",
-            "iface eth1 inet static\n",
-            "  address 10.0.0.205\n",
-            "  network 10.0.0.0\n",
-            "  netmask 255.255.255.0\" >> /etc/network/interfaces\n",
+            "iface eth1 inet dhcp\" >> /etc/network/interfaces\n",
             "ifup eth1\n",
+            "route add default gw 10.0.1.1 eth1\n",
 
             "apt-get install ubuntu-cloud-keyring\n",
             "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
@@ -1902,7 +1917,7 @@
       "Type" : "AWS::EC2::EIPAssociation",
       "Properties" : {
         "AllocationId" : { "Fn::GetAtt": ["QuantumIPAddress", "AllocationId"]},
-        "NetworkInterfaceId" : { "Ref" : "QuantumInterfaceManagement" }
+        "NetworkInterfaceId" : { "Ref" : "QuantumInterfacePublic" }
       }
     },
 
@@ -1910,7 +1925,7 @@
       "Type" : "AWS::EC2::NetworkInterface",
       "Properties" : {
         "Description": "Public network interface",
-        "PrivateIpAddress": "10.0.0.203",
+        "PrivateIpAddress": "10.0.1.13",
         "SubnetId": { "Ref" : "SubnetManagement" },
         "GroupSet": [{ "Ref" : "OpenStackSecurityGroup" }]
       }
@@ -2102,11 +2117,9 @@
             "#! /bin/bash\n",
 
             "echo \"auto eth1\n",
-              "iface eth1 inet static\n",
-              "  address 10.0.0.203\n",
-              "  network 10.0.0.0\n",
-              "  netmask 255.255.255.0\" >> /etc/network/interfaces\n",
-              "ifup eth1\n",
+            "iface eth1 inet dhcp\" >> /etc/network/interfaces\n",
+            "ifup eth1\n",
+            "route add default gw 10.0.1.1 eth1\n",
 
             "apt-get install ubuntu-cloud-keyring\n",
             "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' > /etc/apt/sources.list.d/cloud-archive.list\n",
@@ -2142,28 +2155,24 @@
       "Description" : "Graphical interface URL"
     },
     "QuantumIP" : {
-      "Value" : { "Fn::GetAtt" : [ "QuantumServer", "PublicIp" ] },
-      "Description" : "Quantum public IP (debug)"
+      "Value" : { "Ref" : "QuantumIPAddress" },
+      "Description" : "Quantum public IP (API)"
     },
     "NovaIP" : {
-      "Value" : { "Fn::GetAtt" : [ "NovaServer", "PublicIp" ] },
-      "Description" : "Nova public IP (debug)"
-    },
-    "NovaNodeIP" : {
-      "Value" : { "Fn::GetAtt" : [ "NovaNodeServer", "PublicIp" ] },
-      "Description" : "Nova node public IP (debug)"
+      "Value" : { "Ref" : "NovaIPAddress" },
+      "Description" : "Nova public IP (API)"
     },
     "GlanceIP" : {
-      "Value" : { "Fn::GetAtt" : [ "GlanceServer", "PublicIp" ] },
-      "Description" : "Glance public IP (debug)"
+      "Value" : { "Ref" : "GlanceIPAddress" },
+      "Description" : "Glance public IP (API)"
     },
     "CinderIP" : {
-      "Value" : { "Fn::GetAtt" : [ "CinderServer", "PublicIp" ] },
-      "Description" : "Cinder public IP (debug)"
+      "Value" : { "Ref" : "CinderIPAddress" },
+      "Description" : "Cinder public IP (API)"
     },
     "KeystoneIP" : {
-      "Value" : { "Fn::GetAtt" : [ "KeystoneServer", "PublicIp" ] },
-      "Description" : "Keystone public IP (debug)"
+      "Value" : { "Ref" : "KeystoneIPAddress" },
+      "Description" : "Keystone public IP (API)"
     }
   }
 }
