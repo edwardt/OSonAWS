@@ -2007,6 +2007,9 @@
               "commands" : {
                 "01_setup_quantum" : {
                   "command" : "/opt/osonaws/setup_quantum"
+                },
+                "02_setup_quantum_data" : {
+                  "command" : "/opt/osonaws/setup_quantum_data"
                 }
               }
             }
@@ -2100,6 +2103,10 @@
     "NovaIP" : {
       "Value" : { "Ref" : "NovaIPAddress" },
       "Description" : "Nova public IP (API)"
+    },
+    "ComputeIP" : {
+      "Value" : { "Ref" : "NovaNodeIPAddress" },
+      "Description" : "Nova compute public IP (API)"
     },
     "CinderIP" : {
       "Value" : { "Ref" : "CinderIPAddress" },
