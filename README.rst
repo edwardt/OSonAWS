@@ -32,6 +32,7 @@ OSonAWS launch a stack with minimum 7 servers according to the fallowing schema.
 You can also add a swift cluster with the number of nodes and storage you want.
 
 .. image:: http://s3-ap-southeast-1.amazonaws.com/osonaws/howto/schema.png
+.. image:: http://s3-ap-southeast-1.amazonaws.com/osonaws/howto/network.png
 
 2. Pricing
 ====================
