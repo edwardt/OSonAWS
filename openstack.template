@@ -420,292 +420,290 @@
     },
 
     "KeystoneServer": {
-        "Type": "AWS::EC2::Instance",
-          "Metadata" : {
-            "AWS::CloudFormation::Init" : {
-              "configSets" : {
-                "fullinstall" : [ "setup_seed", "setup_database", "setup_keystone", "setup_horizon"  ]
-               },
-              "setup_seed" : {
-                "files" : {
-                  "/opt/osonaws/tmp/all.preseed" : {
-                    "content" : { "Fn::Join" : ["", [
-                      "mysql-server mysql-server/root_password password ", { "Ref" : "MysqlRootPassword" }, "\n",
-                      "mysql-server mysql-server/root_password_again password ", { "Ref" : "MysqlRootPassword" }, "\n",
-                      "mysql-server mysql-server/start_on_boot boolean true\n"
-                    ]]},
-                    "mode"  : "000600",
-                    "owner" : "ubuntu",
-                    "group" : "ubuntu"
-                  },
-                  "/opt/osonaws/tmp/setup_seed" : {
-                    "content" : { "Fn::Join" : ["", [
-                      "#!/bin/bash -v\n",
-                      "debconf-set-selections < /opt/osonaws/tmp/all.preseed\n"
-                    ]]},
-                    "mode"  : "000700",
-                    "owner" : "ubuntu",
-                    "group" : "ubuntu"
-                  }
+      "Type": "AWS::EC2::Instance",
+        "Metadata" : {
+          "AWS::CloudFormation::Init" : {
+            "configSets" : {
+              "fullinstall" : [ "setup_seed", "setup_database", "setup_keystone", "setup_horizon"  ]
+            },
+            "setup_seed" : {
+              "files" : {
+                "/opt/osonaws/tmp/all.preseed" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "mysql-server mysql-server/root_password password ", { "Ref" : "MysqlRootPassword" }, "\n",
+                    "mysql-server mysql-server/root_password_again password ", { "Ref" : "MysqlRootPassword" }, "\n",
+                    "mysql-server mysql-server/start_on_boot boolean true\n"
+                  ]]},
+                  "mode"  : "000600",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
                 },
-                "commands" : {
-                  "01_seed" : {
-                    "command" : "/opt/osonaws/tmp/setup_seed"
-                  }
+                "/opt/osonaws/tmp/setup_seed" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -v\n",
+                    "debconf-set-selections < /opt/osonaws/tmp/all.preseed\n"
+                  ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
                 }
               },
-              "setup_database" : {
-                "packages" : {
-                  "apt" : {
-                    "mysql-server"            : []
-                  }
-                },
-                "files" : {
-                  "/opt/osonaws/setup.mysql" : {
-                    "content" : { "Fn::Join" : ["", [
-                      "CREATE DATABASE keystone;\n",
-                      "GRANT ALL ON keystone.* TO 'keystone'@'%' IDENTIFIED BY '", { "Ref" : "MysqlUserPassword" }, "';\n",
-                      "GRANT ALL ON keystone.* TO 'keystone'@'localhost' IDENTIFIED BY '", { "Ref" : "MysqlUserPassword" }, "';\n"
-                    ]]},
-                    "mode"  : "000600",
-                    "owner" : "ubuntu",
-                    "group" : "ubuntu"
-                  },
-                  "/opt/osonaws/setup_database" : {
-                    "content" : { "Fn::Join" : ["", [
-                      "#!/bin/bash -v\n",
-                      "mysql -u root --password='", { "Ref" : "MysqlRootPassword" }, "' < /opt/osonaws/setup.mysql\n"
-                    ]]},
-                    "mode"  : "000700",
-                    "owner" : "ubuntu",
-                    "group" : "ubuntu"
-                  }
-                },
-                "commands" : {
-                  "01_setup_database" : {
-                    "command" : "/opt/osonaws/setup_database"
-                  }
+              "commands" : {
+                "01_seed" : {
+                  "command" : "/opt/osonaws/tmp/setup_seed"
+                }
+              }
+            },
+            "setup_database" : {
+              "packages" : {
+                "apt" : {
+                  "mysql-server"            : []
                 }
               },
-              "setup_keystone" : {
-                "packages" : {
-                  "apt" : {
-                    "keystone"                 : [],
-                    "python-mysqldb"           : [],
-                    "python-keystoneclient"    : []
-                  }
+              "files" : {
+                "/opt/osonaws/setup.mysql" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "CREATE DATABASE keystone;\n",
+                    "GRANT ALL ON keystone.* TO 'keystone'@'%' IDENTIFIED BY '", { "Ref" : "MysqlUserPassword" }, "';\n",
+                    "GRANT ALL ON keystone.* TO 'keystone'@'localhost' IDENTIFIED BY '", { "Ref" : "MysqlUserPassword" }, "';\n"
+                  ]]},
+                  "mode"  : "000600",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
                 },
-                "files" : {
-                  "/opt/osonaws/setup_keystone" : {
-                    "content" : { "Fn::Join" : ["", [
-                      "#!/bin/bash -v\n",
-
-                      "rm /var/lib/keystone/keystone.db\n",
-                      "sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mysql/my.cnf\n",
-                      "sed -i \"s/sqlite:\\/\\/\\/\\/var\\/lib\\/keystone\\/keystone.db\/mysql:\\/\\/keystone:", { "Ref" : "MysqlUserPassword" }, "@0.0.0.0\\/keystone\/g\" /etc/keystone/keystone.conf\n",
-                      "sed -i \"s/# admin_token = ADMIN/admin_token = ", { "Ref" : "KeystoneAdminToken" }, "/g\" /etc/keystone/keystone.conf\n",
-                      "sed -i \"s/# bind_host/bind_host/g\" /etc/keystone/keystone.conf\n",
-                      "sed -i \"s/# public_port/public_port/g\" /etc/keystone/keystone.conf\n",
-                      "sed -i \"s/# public_port/public_port/g\" /etc/keystone/keystone.conf\n",
-                      "sed -i \"s/# compute_port/compute_port/g\" /etc/keystone/keystone.conf\n",
-                      "service mysql restart\n",
-                      "service keystone restart\n",
-                      "keystone-manage db_sync\n",
-                      
-                      "echo 'source /opt/osonaws/keystonerc' >> /home/ubuntu/.bashrc\n"
-                    ]]},
-                    "mode"  : "000700",
-                    "owner" : "ubuntu",
-                    "group" : "ubuntu"
-                  },
-                  "/opt/osonaws/setup_keystone_data" : {
-                    "content" : { "Fn::Join" : ["", [
-                      "#!/bin/bash -v\n",        
-                      "function get_id () {\n",
-                      " echo `\"$@\" | awk '/ id / { print $4 }'`\n",
-                      "}\n",
-
-                      "SERVICE_TENANT_NAME=${SERVICE_TENANT_NAME:-service}\n",
-                      "SERVICE_HOST='127.0.0.1'\n",
-                      "export SERVICE_TOKEN='", { "Ref" : "KeystoneAdminToken" }, "'\n",
-                      "export SERVICE_ENDPOINT='http://0.0.0.0:35357/v2.0'\n",
-                      "ADMIN_PASSWORD=${ADMIN_PASSWORD:-", { "Ref" : "HorizonAdminPassword" }, "}\n",
-                      "SERVICE_PASSWORD=${SERVICE_PASSWORD:-$ADMIN_PASSWORD}\n",
-
-                      "# Tenants\n",
-                      "ADMIN_TENANT=$(get_id keystone tenant-create --name=admin)\n",
-                      "SERVICE_TENANT=$(get_id keystone tenant-create --name=\"$SERVICE_TENANT_NAME\")\n",
-                      "DEMO_TENANT=$(get_id keystone tenant-create --name=", { "Ref" : "HorizonDemoProjectName" }, ")\n",
-                      "INVIS_TENANT=$(get_id keystone tenant-create --name=invisible_to_admin)\n",
-
-                      "# Users\n",
-                      "ADMIN_USER=$(get_id keystone user-create --name=admin --pass=", { "Ref" : "HorizonAdminPassword" }, " --email=admin@domain.com)\n",
-                      "DEMO_USER=$(get_id keystone user-create --name=", { "Ref" : "HorizonDemoLogin" }, " --pass=", { "Ref" : "HorizonDemoPassword" }, " --email=demo@domain.com)\n",
-
-                      "# Roles\n",
-                      "ADMIN_ROLE=$(get_id keystone role-create --name=admin)\n",
-                      "KEYSTONEADMIN_ROLE=$(get_id keystone role-create --name=KeystoneAdmin)\n",
-                      "KEYSTONESERVICE_ROLE=$(get_id keystone role-create --name=KeystoneServiceAdmin)\n",
-
-                      "# Add Roles to Users in Tenants\n",
-                      "keystone user-role-add --user-id $ADMIN_USER --role-id $ADMIN_ROLE --tenant-id $ADMIN_TENANT\n",
-                      "keystone user-role-add --user-id $ADMIN_USER --role-id $ADMIN_ROLE --tenant-id $DEMO_TENANT\n",
-                      "keystone user-role-add --user-id $ADMIN_USER --role-id $KEYSTONEADMIN_ROLE --tenant-id $ADMIN_TENANT\n",
-                      "keystone user-role-add --user-id $ADMIN_USER --role-id $KEYSTONESERVICE_ROLE --tenant-id $ADMIN_TENANT\n",
-
-                      "# The Member role is used by Horizon and Swift\n",
-                      "MEMBER_ROLE=$(get_id keystone role-create --name=Member)\n",
-                      "keystone user-role-add --user-id $DEMO_USER --role-id $MEMBER_ROLE --tenant-id $DEMO_TENANT\n",
-                      "keystone user-role-add --user-id $DEMO_USER --role-id $MEMBER_ROLE --tenant-id $INVIS_TENANT\n",
-
-                      "# Configure service users/roles\n",
-                      "NOVA_USER=$(get_id keystone user-create --name=nova --pass=\"", { "Ref" : "ServicePassword" }, "\" --tenant-id $SERVICE_TENANT --email=nova@domain.com)\n",
-                      "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $NOVA_USER --role-id $ADMIN_ROLE\n",
-                      "GLANCE_USER=$(get_id keystone user-create --name=glance --pass=\"", { "Ref" : "ServicePassword" }, "\" --tenant-id $SERVICE_TENANT --email=glance@domain.com)\n",
-                      "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $GLANCE_USER --role-id $ADMIN_ROLE\n",
-                      "SWIFT_USER=$(get_id keystone user-create --name=swift --pass=\"", { "Ref" : "ServicePassword" }, "\" --tenant-id $SERVICE_TENANT --email=swift@example.com)\n",
-                      "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $SWIFT_USER --role-id $ADMIN_ROLE\n",
-                      "RESELLER_ROLE=$(get_id keystone role-create --name=ResellerAdmin)\n",
-                      "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $NOVA_USER --role-id $RESELLER_ROLE\n",
-                      "QUANTUM_USER=$(get_id keystone user-create --name=quantum --pass=\"", { "Ref" : "ServicePassword" }, "\" --tenant-id $SERVICE_TENANT --email=quantum@domain.com)\n",
-                      "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $QUANTUM_USER --role-id $ADMIN_ROLE\n",
-                      "CINDER_USER=$(get_id keystone user-create --name=cinder --pass=\"", { "Ref" : "ServicePassword" }, "\" --tenant-id $SERVICE_TENANT --email=cinder@domain.com)\n",
-                      "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $CINDER_USER --role-id $ADMIN_ROLE\n",
-
-                      "#Services creation\n",
-                      "NOVA_SERVICE=$(get_id keystone service-create --name nova --type compute --description 'OpenStack Compute Service')\n",
-                      "CINDER_SERVICE=$(get_id keystone service-create --name cinder --type volume --description 'OpenStack Volume Service')\n",
-                      "GLANCE_SERVICE=$(get_id keystone service-create --name glance --type image --description 'OpenStack Image Service')\n",
-                      "SWIFT_SERVICE=$(get_id keystone service-create --name swift --type object-store --description 'OpenStack Storage Service')\n",
-                      "KEYSTONE_SERVICE=$(get_id keystone service-create --name keystone --type identity --description 'OpenStack Identity')\n",
-                      "EC2_SERVICE=$(get_id keystone service-create --name ec2 --type ec2 --description 'OpenStack EC2 service')\n",
-                      "QUANTUM_SERVICE=$(get_id keystone service-create --name quantum --type network --description 'OpenStack Networking service')\n",
-
-                      "#Endpoint creation\n",
-                      "keystone endpoint-create --region RegionOne --service-id $GLANCE_SERVICE --publicurl 'http:\/\/", { "Ref" : "CinderIPAddress" }, ":9292/v2' --adminurl 'http:\/\/10.0.0.11:9292/v2' --internalurl 'http:\/\/10.0.0.11:9292/v2'\n",
-                      "keystone endpoint-create --region RegionOne --service-id $CINDER_SERVICE --publicurl 'http:\/\/", { "Ref" : "CinderIPAddress" }, ":8776\/v1\/%(tenant_id)s' --adminurl 'http:\/\/10.0.0.11:8776\/v1\/%(tenant_id)s' --internalurl 'http:\/\/10.0.0.11:8776\/v1\/%(tenant_id)s'\n",                  
-                      "keystone endpoint-create --region RegionOne --service-id $KEYSTONE_SERVICE --publicurl 'http:\/\/", { "Ref" : "KeystoneIPAddress" }, ":5000/v2.0' --adminurl 'http:\/\/10.0.0.10:5000/v2.0' --internalurl 'http:\/\/10.0.0.10:5000/v2.0'\n",
-                      "keystone endpoint-create --region RegionOne --service-id $NOVA_SERVICE --publicurl 'http:\/\/", { "Ref" : "NovaIPAddress" }, ":8774/v2/%(tenant_id)s' --adminurl 'http:\/\/10.0.0.14:8774/v2/%(tenant_id)s' --internalurl 'http:\/\/10.0.0.14:8774/v2/%(tenant_id)s'\n",
-                      "keystone endpoint-create --region RegionOne --service-id $EC2_SERVICE --publicurl 'http:\/\/", { "Ref" : "NovaIPAddress" }, ":8773/services/Cloud' --adminurl 'http:\/\/10.0.0.14:8773/services/Admin' --internalurl 'http:\/\/10.0.0.14:8773/services/Cloud'\n",
-                      "keystone endpoint-create --region RegionOne --service-id $QUANTUM_SERVICE --publicurl 'http:\/\/", { "Ref" : "NovaIPAddress" }, ":9696/' --adminurl 'http:\/\/10.0.0.14:9696/' --internalurl 'http:\/\/10.0.0.14:9696/'\n"
-                      ]]},
-                    "mode"  : "000700",
-                    "owner" : "ubuntu",
-                    "group" : "ubuntu"
-                  },
-                  "/opt/osonaws/keystonerc" : {
-                    "content" : { "Fn::Join" : ["", [
-                      "export SERVICE_TOKEN='", { "Ref" : "KeystoneAdminToken" }, "'\n",
-                      "export SERVICE_ENDPOINT='http://0.0.0.0:35357/v2.0'\n"
-                    ]]},
-                    "mode"  : "000700",
-                    "owner" : "ubuntu",
-                    "group" : "ubuntu"
-                  }
-                },
-                "commands" : {
-                  "01_setup_keystone" : {
-                    "command" : "/opt/osonaws/setup_keystone"
-                  },
-                  "02_setup_keystone_data" : {
-                    "command" : "/opt/osonaws/setup_keystone_data"
-                  }
+                "/opt/osonaws/setup_database" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -v\n",
+                    "mysql -u root --password='", { "Ref" : "MysqlRootPassword" }, "' < /opt/osonaws/setup.mysql\n"
+                  ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
                 }
               },
-              "setup_horizon" : {
-                "packages" : {
-                  "apt" : {
-                    "apache2"                : [],
-                    "libapache2-mod-wsgi"    : [],
-                    "openstack-dashboard"    : [],
-                    "memcached"              : [],
-                    "python-memcache"        : []
-                  }
-                },
-                "files" : {
-                  "/opt/osonaws/setup_horizon" : {
-                    "content" : { "Fn::Join" : ["", [
-                      "#!/bin/bash -v\n",
+              "commands" : {
+                "01_setup_database" : {
+                  "command" : "/opt/osonaws/setup_database"
+                }
+              }
+            },
+            "setup_keystone" : {
+              "packages" : {
+                "apt" : {
+                  "keystone"                 : [],
+                  "python-mysqldb"           : [],
+                  "python-keystoneclient"    : []
+                }
+              },
+              "files" : {
+                "/opt/osonaws/setup_keystone" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -v\n",
+                    "rm /var/lib/keystone/keystone.db\n",
+                    "sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mysql/my.cnf\n",
+                    "sed -i \"s/sqlite:\\/\\/\\/\\/var\\/lib\\/keystone\\/keystone.db\/mysql:\\/\\/keystone:", { "Ref" : "MysqlUserPassword" }, "@0.0.0.0\\/keystone\/g\" /etc/keystone/keystone.conf\n",
+                    "sed -i \"s/# admin_token = ADMIN/admin_token = ", { "Ref" : "KeystoneAdminToken" }, "/g\" /etc/keystone/keystone.conf\n",
+                    "sed -i \"s/# bind_host/bind_host/g\" /etc/keystone/keystone.conf\n",
+                    "sed -i \"s/# public_port/public_port/g\" /etc/keystone/keystone.conf\n",
+                    "sed -i \"s/# public_port/public_port/g\" /etc/keystone/keystone.conf\n",
+                    "sed -i \"s/# compute_port/compute_port/g\" /etc/keystone/keystone.conf\n",
+                    "service mysql restart\n",
+                    "service keystone restart\n",
+                    "keystone-manage db_sync\n",
 
-                      "sed -i 's/try/#try/g' /etc/openstack-dashboard/local_settings.py\n",
-                      "sed -i 's/from ubuntu_theme import/#from ubuntu_theme import/g' /etc/openstack-dashboard/local_settings.py\n",
-                      "sed -i 's/except ImportError/#except ImportError/g' /etc/openstack-dashboard/local_settings.py\n",
-                      "sed -i 's/pass/#pass/g' /etc/openstack-dashboard/local_settings.py\n",
-
-                      "service apache2 restart\n"
-                    ]]},
-                    "mode"  : "000700",
-                    "owner" : "ubuntu",
-                    "group" : "ubuntu"
-                  }
+                    "echo 'source /opt/osonaws/keystonerc' >> /home/ubuntu/.bashrc\n"
+                  ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
                 },
-                "commands" : {
-                  "01_setup_keystone" : {
-                    "command" : "/opt/osonaws/setup_horizon"
-                  }
+                "/opt/osonaws/setup_keystone_data" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -v\n",        
+                    "function get_id () {\n",
+                    " echo `\"$@\" | awk '/ id / { print $4 }'`\n",
+                    "}\n",
+                    "SERVICE_TENANT_NAME=${SERVICE_TENANT_NAME:-service}\n",
+                    "SERVICE_HOST='127.0.0.1'\n",
+                    "export SERVICE_TOKEN='", { "Ref" : "KeystoneAdminToken" }, "'\n",
+                    "export SERVICE_ENDPOINT='http://0.0.0.0:35357/v2.0'\n",
+                    "ADMIN_PASSWORD=${ADMIN_PASSWORD:-", { "Ref" : "HorizonAdminPassword" }, "}\n",
+                    "SERVICE_PASSWORD=${SERVICE_PASSWORD:-$ADMIN_PASSWORD}\n",
+                    "# Tenants\n",
+                    "ADMIN_TENANT=$(get_id keystone tenant-create --name=admin)\n",
+                    "SERVICE_TENANT=$(get_id keystone tenant-create --name=\"$SERVICE_TENANT_NAME\")\n",
+                    "DEMO_TENANT=$(get_id keystone tenant-create --name=", { "Ref" : "HorizonDemoProjectName" }, ")\n",
+                    "INVIS_TENANT=$(get_id keystone tenant-create --name=invisible_to_admin)\n",
+
+                    "# Users\n",
+                    "ADMIN_USER=$(get_id keystone user-create --name=admin --pass=", { "Ref" : "HorizonAdminPassword" }, " --email=admin@domain.com)\n",
+                    "DEMO_USER=$(get_id keystone user-create --name=", { "Ref" : "HorizonDemoLogin" }, " --pass=", { "Ref" : "HorizonDemoPassword" }, " --email=demo@domain.com)\n",
+                    "# Roles\n",
+                    "ADMIN_ROLE=$(get_id keystone role-create --name=admin)\n",
+                    "KEYSTONEADMIN_ROLE=$(get_id keystone role-create --name=KeystoneAdmin)\n",
+                    "KEYSTONESERVICE_ROLE=$(get_id keystone role-create --name=KeystoneServiceAdmin)\n",
+
+                    "# Add Roles to Users in Tenants\n",
+                    "keystone user-role-add --user-id $ADMIN_USER --role-id $ADMIN_ROLE --tenant-id $ADMIN_TENANT\n",
+                    "keystone user-role-add --user-id $ADMIN_USER --role-id $ADMIN_ROLE --tenant-id $DEMO_TENANT\n",
+                    "keystone user-role-add --user-id $ADMIN_USER --role-id $KEYSTONEADMIN_ROLE --tenant-id $ADMIN_TENANT\n",
+                    "keystone user-role-add --user-id $ADMIN_USER --role-id $KEYSTONESERVICE_ROLE --tenant-id $ADMIN_TENANT\n",
+
+                    "# The Member role is used by Horizon and Swift\n",
+                    "MEMBER_ROLE=$(get_id keystone role-create --name=Member)\n",
+                    "keystone user-role-add --user-id $DEMO_USER --role-id $MEMBER_ROLE --tenant-id $DEMO_TENANT\n",
+                    "keystone user-role-add --user-id $DEMO_USER --role-id $MEMBER_ROLE --tenant-id $INVIS_TENANT\n",
+
+                    "# Configure service users/roles\n",
+                    "NOVA_USER=$(get_id keystone user-create --name=nova --pass=\"", { "Ref" : "ServicePassword" }, "\" --tenant-id $SERVICE_TENANT --email=nova@domain.com)\n",
+                    "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $NOVA_USER --role-id $ADMIN_ROLE\n",
+                    "GLANCE_USER=$(get_id keystone user-create --name=glance --pass=\"", { "Ref" : "ServicePassword" }, "\" --tenant-id $SERVICE_TENANT --email=glance@domain.com)\n",
+                    "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $GLANCE_USER --role-id $ADMIN_ROLE\n",
+                    "SWIFT_USER=$(get_id keystone user-create --name=swift --pass=\"", { "Ref" : "ServicePassword" }, "\" --tenant-id $SERVICE_TENANT --email=swift@example.com)\n",
+                    "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $SWIFT_USER --role-id $ADMIN_ROLE\n",
+                    "RESELLER_ROLE=$(get_id keystone role-create --name=ResellerAdmin)\n",
+                    "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $NOVA_USER --role-id $RESELLER_ROLE\n",
+                    "QUANTUM_USER=$(get_id keystone user-create --name=quantum --pass=\"", { "Ref" : "ServicePassword" }, "\" --tenant-id $SERVICE_TENANT --email=quantum@domain.com)\n",
+                    "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $QUANTUM_USER --role-id $ADMIN_ROLE\n",
+                    "CINDER_USER=$(get_id keystone user-create --name=cinder --pass=\"", { "Ref" : "ServicePassword" }, "\" --tenant-id $SERVICE_TENANT --email=cinder@domain.com)\n",
+                    "keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $CINDER_USER --role-id $ADMIN_ROLE\n",
+
+                    "#Services creation\n",
+                    "NOVA_SERVICE=$(get_id keystone service-create --name nova --type compute --description 'OpenStack Compute Service')\n",
+                    "CINDER_SERVICE=$(get_id keystone service-create --name cinder --type volume --description 'OpenStack Volume Service')\n",
+                    "GLANCE_SERVICE=$(get_id keystone service-create --name glance --type image --description 'OpenStack Image Service')\n",
+                    "SWIFT_SERVICE=$(get_id keystone service-create --name swift --type object-store --description 'OpenStack Storage Service')\n",
+                    "KEYSTONE_SERVICE=$(get_id keystone service-create --name keystone --type identity --description 'OpenStack Identity')\n",
+                    "EC2_SERVICE=$(get_id keystone service-create --name ec2 --type ec2 --description 'OpenStack EC2 service')\n",
+                    "QUANTUM_SERVICE=$(get_id keystone service-create --name quantum --type network --description 'OpenStack Networking service')\n",
+
+                    "#Endpoint creation\n",
+                    "keystone endpoint-create --region RegionOne --service-id $GLANCE_SERVICE --publicurl 'http:\/\/", { "Ref" : "CinderIPAddress" }, ":9292/v2' --adminurl 'http:\/\/10.0.0.11:9292/v2' --internalurl 'http:\/\/10.0.0.11:9292/v2'\n",
+                    "keystone endpoint-create --region RegionOne --service-id $CINDER_SERVICE --publicurl 'http:\/\/", { "Ref" : "CinderIPAddress" }, ":8776\/v1\/%(tenant_id)s' --adminurl 'http:\/\/10.0.0.11:8776\/v1\/%(tenant_id)s' --internalurl 'http:\/\/10.0.0.11:8776\/v1\/%(tenant_id)s'\n",                  
+                    "keystone endpoint-create --region RegionOne --service-id $KEYSTONE_SERVICE --publicurl 'http:\/\/", { "Ref" : "KeystoneIPAddress" }, ":5000/v2.0' --adminurl 'http:\/\/10.0.0.10:5000/v2.0' --internalurl 'http:\/\/10.0.0.10:5000/v2.0'\n",
+                    "keystone endpoint-create --region RegionOne --service-id $NOVA_SERVICE --publicurl 'http:\/\/", { "Ref" : "NovaIPAddress" }, ":8774/v2/%(tenant_id)s' --adminurl 'http:\/\/10.0.0.14:8774/v2/%(tenant_id)s' --internalurl 'http:\/\/10.0.0.14:8774/v2/%(tenant_id)s'\n",
+                    "keystone endpoint-create --region RegionOne --service-id $EC2_SERVICE --publicurl 'http:\/\/", { "Ref" : "NovaIPAddress" }, ":8773/services/Cloud' --adminurl 'http:\/\/10.0.0.14:8773/services/Admin' --internalurl 'http:\/\/10.0.0.14:8773/services/Cloud'\n",
+                    "keystone endpoint-create --region RegionOne --service-id $QUANTUM_SERVICE --publicurl 'http:\/\/", { "Ref" : "NovaIPAddress" }, ":9696/' --adminurl 'http:\/\/10.0.0.14:9696/' --internalurl 'http:\/\/10.0.0.14:9696/'\n"
+                  ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                },
+                "/opt/osonaws/keystonerc" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "export SERVICE_TOKEN='", { "Ref" : "KeystoneAdminToken" }, "'\n",
+                    "export SERVICE_ENDPOINT='http://0.0.0.0:35357/v2.0'\n"
+                  ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                }
+              },
+              "commands" : {
+                "01_setup_keystone" : {
+                  "command" : "/opt/osonaws/setup_keystone"
+                },
+                "02_setup_keystone_data" : {
+                  "command" : "/opt/osonaws/setup_keystone_data"
+                }
+              }
+            },
+            "setup_horizon" : {
+              "packages" : {
+                "apt" : {
+                  "apache2"                : [],
+                  "libapache2-mod-wsgi"    : [],
+                  "openstack-dashboard"    : [],
+                  "memcached"              : [],
+                  "python-memcache"        : []
+                }
+              },
+              "files" : {
+                "/opt/osonaws/setup_horizon" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -v\n",
+
+                    "sed -i 's/try/#try/g' /etc/openstack-dashboard/local_settings.py\n",
+                    "sed -i 's/from ubuntu_theme import/#from ubuntu_theme import/g' /etc/openstack-dashboard/local_settings.py\n",
+                    "sed -i 's/except ImportError/#except ImportError/g' /etc/openstack-dashboard/local_settings.py\n",
+                    "sed -i 's/pass/#pass/g' /etc/openstack-dashboard/local_settings.py\n",
+
+                    "service apache2 restart\n"
+                  ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                }
+              },
+              "commands" : {
+                "01_setup_horizon" : {
+                  "command" : "/opt/osonaws/setup_horizon"
                 }
               }
             }
+          }
+        },
+        "Properties" : {
+          "KeyName" : { "Ref" : "KeyName" },
+          "InstanceType": { "Ref": "InstanceType" },
+          "ImageId" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AMI" ] },
+          "AvailabilityZone" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AZ" ] },
+          "Tags" : [{ "Key" : "Name", "Value" : "Keystone" }],
+          "NetworkInterfaces" : [{
+            "NetworkInterfaceId" : {"Ref" : "KeystoneInterfaceManagement"},
+            "DeviceIndex" : "0"
           },
-          "Properties" : {
-            "KeyName" : { "Ref" : "KeyName" },
-            "InstanceType": { "Ref": "InstanceType" },
-            "ImageId" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AMI" ] },
-            "AvailabilityZone" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AZ" ] },
-            "Tags" : [{ "Key" : "Name", "Value" : "Keystone" }],
-            "NetworkInterfaces" : [
-              {
-                "NetworkInterfaceId" : {"Ref" : "KeystoneInterfaceManagement"},
-                "DeviceIndex" : "0"
-              },
-              {
-                "NetworkInterfaceId" : {"Ref" : "KeystoneInterfacePublic"},
-                "DeviceIndex" : "1"
-              }],
-            "Monitoring" : "false",
-            "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
-               "#! /bin/bash\n",
+          {
+            "NetworkInterfaceId" : {"Ref" : "KeystoneInterfacePublic"},
+            "DeviceIndex" : "1"
+          }],
+          "Monitoring" : "false",
+          "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
+            "#! /bin/bash\n",
 
-               "echo \"auto eth1\n",
-               "iface eth1 inet dhcp\" >> /etc/network/interfaces\n",
-               "ifup eth1\n",
-               "route add default gw 10.0.1.1 eth1\n",
-               "route del default gw 10.0.0.1 eth0\n",
-               
-               "echo \" net.ipv4.conf.all.rp_filter = 0\n",
-               "net.ipv4.conf.default.rp_filter = 0\" >> /etc/sysctl.conf\n",
-               "sysctl -p\n",
-              
-               "echo \"10.0.0.10 `hostname`\" >> /etc/hosts\n",
-               
-              "#DEBUG\n",
-              "wget ", { "Ref" : "SSHprivateKeyURL" }, "\n",
-              "mv ./id_dsa /home/ubuntu/.ssh/\n",
-              "chown ubuntu:ubuntu /home/ubuntu/.ssh/id_dsa\n",
-              "chmod 700  /home/ubuntu/.ssh/id_dsa\n",
-               
-               "apt-get install ubuntu-cloud-keyring\n",
-               "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
-               "echo 'APT::Get::AllowUnauthenticated \"true\";' >> /etc/apt/apt.conf.d/70debconf\n",
-               "apt-get update\n",
+            "echo \"auto eth1\n",
+            "iface eth1 inet dhcp\" >> /etc/network/interfaces\n",
+            "ifup eth1\n",
+            "route add default gw 10.0.1.1 eth1\n",
+            "route del default gw 10.0.0.1 eth0\n",
 
-               "apt-get -y install python-setuptools\n",
-               "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",  
+            "echo \" net.ipv4.conf.all.rp_filter = 0\n",
+            "net.ipv4.conf.default.rp_filter = 0\" >> /etc/sysctl.conf\n",
+            "sysctl -p\n",
 
-               "function error_exit\n",
-               "{\n",
-               "  cfn-signal -e 1 -r \"$1\" '", { "Ref" : "KeystoneWaitHandle" }, "'\n",
-               "  exit 1\n",
-               "}\n",
+            "echo \"10.0.0.10 `hostname`\" >> /etc/hosts\n",
 
-               "cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r KeystoneServer ",
-               "    --access-key ",  { "Ref" : "OpenStackUserAccessKey" },
-               "    --secret-key ", {"Fn::GetAtt": ["OpenStackUserAccessKey", "SecretAccessKey"]},
-               "    --region ", { "Ref" : "AWS::Region" }, 
-               "    --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
-               "# All is well so signal success\n",
+            "#DEBUG\n",
+            "wget ", { "Ref" : "SSHprivateKeyURL" }, "\n",
+            "mv ./id_dsa /home/ubuntu/.ssh/\n",
+            "chown ubuntu:ubuntu /home/ubuntu/.ssh/id_dsa\n",
+            "chmod 700  /home/ubuntu/.ssh/id_dsa\n",
 
-               "cfn-signal -e 0 -r \"Keystone setup complete\" '", { "Ref" : "KeystoneWaitHandle" }, "'\n"
+            "wget ", { "Ref" : "SSHpublicKeyURL" }, "\n",
+            "cat ./id_dsa.pub >> /home/ubuntu/.ssh/authorized_keys\n",
+
+            "apt-get install ubuntu-cloud-keyring\n",
+            "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
+            "echo 'APT::Get::AllowUnauthenticated \"true\";' >> /etc/apt/apt.conf.d/70debconf\n",
+            "apt-get update\n",
+
+            "apt-get -y install python-setuptools\n",
+            "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",  
+
+            "function error_exit\n",
+            "{\n",
+            "  cfn-signal -e 1 -r \"$1\" '", { "Ref" : "KeystoneWaitHandle" }, "'\n",
+            "  exit 1\n",
+            "}\n",
+
+            "cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r KeystoneServer ",
+            "    --access-key ",  { "Ref" : "OpenStackUserAccessKey" },
+            "    --secret-key ", {"Fn::GetAtt": ["OpenStackUserAccessKey", "SecretAccessKey"]},
+            "    --region ", { "Ref" : "AWS::Region" }, 
+            "    --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
+            "# All is well so signal success\n",
+
+            "cfn-signal -e 0 -r \"Keystone setup complete\" '", { "Ref" : "KeystoneWaitHandle" }, "'\n"
           ]]}
         }
       }
@@ -938,6 +936,25 @@
                   "owner" : "ubuntu",
                   "group" : "ubuntu"
                 },
+                "/opt/osonaws/setup_glance_data" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -v\n",
+                    "function get_id () {\n",
+                    "echo `\"$@\" | awk '/ id / { print $4 }'`\n",
+                    "}\n",
+                    "source /opt/osonaws/glancerc\n",
+                    "cd\n",
+                    "mkdir images\n",
+                    "cd ./images\n",
+                    "wget http://uec-images.ubuntu.com/precise/current/precise-server-cloudimg-amd64.tar.gz\n",
+                    "tar -zxvf ./precise-server-cloudimg-amd64.tar.gz\n",
+                    "KERNEL_ID=$(get_id glance image-create --name \"precise-server-cloudimg-amd64-kernel\" --public --container-format aki --disk-format aki < precise-server-cloudimg-amd64-vmlinuz-virtual)\n",
+                    "glance image-create --name \"precise-server-cloudimg-amd64\" --public --container-format ami --disk-format ami --property kernel_id=$KERNEL_ID < precise-server-cloudimg-amd64.img\n"
+                  ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                },
                 "/opt/osonaws/glancerc" : {
                   "content" : { "Fn::Join" : ["", [
                     "export OS_USERNAME=glance\n",
@@ -953,6 +970,9 @@
               "commands" : {
                 "01_setup_glance" : {
                   "command" : "/opt/osonaws/setup_glance"
+                },
+                "02_setup_glance" : {
+                  "command" : "/opt/osonaws/setup_glance_data &"
                 }
               }
             }
@@ -990,11 +1010,8 @@
 
             "echo \"10.0.0.11 `hostname`\" >> /etc/hosts\n",
 
-              "#DEBUG\n",
-              "wget ", { "Ref" : "SSHprivateKeyURL" }, "\n",
-              "mv ./id_dsa /home/ubuntu/.ssh/\n",
-              "chown ubuntu:ubuntu /home/ubuntu/.ssh/id_dsa\n",
-              "chmod 700  /home/ubuntu/.ssh/id_dsa\n",
+            "wget ", { "Ref" : "SSHpublicKeyURL" }, "\n",
+            "cat ./id_dsa.pub >> /home/ubuntu/.ssh/authorized_keys\n",
               
             "apt-get install ubuntu-cloud-keyring\n",
             "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' > /etc/apt/sources.list.d/cloud-archive.list\n",
@@ -1020,7 +1037,8 @@
             "cfn-signal -e 0 -r \"Cinder setup complete\" '", { "Ref" : "CinderWaitHandle" }, "'\n"
           ]]}
         }
-      }
+      },
+      "DependsOn" : "KeystoneServer"
     },
 
     "CinderVolume" : {
@@ -1192,7 +1210,7 @@
                     "ec2_private_dns_show_ip=True\n",
                     "dmz_cidr=169.254.169.254/32\n",
                     "ec2_dmz_host=10.0.0.14\n",
-                    "metadata_host=10.0.0.14\n",
+                    "metadata_host=10.0.0.15\n",
                     "metadata_listen=0.0.0.0\n",
                     "enabled_apis=ec2,osapi_compute,metadata\n",
 
@@ -1400,12 +1418,8 @@
 
               "echo \"10.0.0.14 `hostname`\" >> /etc/hosts\n",
 
-              "#DEBUG\n",
-              "wget ", { "Ref" : "SSHprivateKeyURL" }, "\n",
-              "mv ./id_dsa /home/ubuntu/.ssh/\n",
-              "chown ubuntu:ubuntu /home/ubuntu/.ssh/id_dsa\n",
-              "chmod 700  /home/ubuntu/.ssh/id_dsa\n",
-               
+              "wget ", { "Ref" : "SSHpublicKeyURL" }, "\n",
+              "cat ./id_dsa.pub >> /home/ubuntu/.ssh/authorized_keys\n",
 
               "apt-get install ubuntu-cloud-keyring\n",
               "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
@@ -1431,36 +1445,37 @@
               "cfn-signal -e 0 -r \"Nova setup complete\" '", { "Ref" : "NovaWaitHandle" }, "'\n"
           ]]}
         }
-      }
+      },
+      "DependsOn" : "KeystoneServer"
     },
 
-    "NovaNodeWaitHandle" : {
+    "ComputeWaitHandle" : {
       "Type" : "AWS::CloudFormation::WaitConditionHandle"
     },
 
-    "NovaNodeWaitCondition" : {
+    "ComputeWaitCondition" : {
       "Type" : "AWS::CloudFormation::WaitCondition",
-      "DependsOn" : "NovaNodeServer",
+      "DependsOn" : "ComputeServer",
       "Properties" : {
-        "Handle" : {"Ref" : "NovaNodeWaitHandle"},
+        "Handle" : {"Ref" : "ComputeWaitHandle"},
         "Timeout" : "1200"
       }
     },
 
-    "NovaNodeIPAddress" : {
+    "ComputeIPAddress" : {
       "Type" : "AWS::EC2::EIP",
       "Properties" : {"Domain" : "vpc"}
     },
 
-    "NovaNodeIPAssoc" : {
+    "ComputeIPAssoc" : {
       "Type" : "AWS::EC2::EIPAssociation",
       "Properties" : {
-        "AllocationId" : { "Fn::GetAtt": ["NovaNodeIPAddress", "AllocationId"]},
-        "NetworkInterfaceId" : { "Ref" : "NovaNodeInterfacePublic" }
+        "AllocationId" : { "Fn::GetAtt": ["ComputeIPAddress", "AllocationId"]},
+        "NetworkInterfaceId" : { "Ref" : "ComputeInterfacePublic" }
       }
     },
     
-    "NovaNodeInterfacePublic" : {
+    "ComputeInterfacePublic" : {
       "Type" : "AWS::EC2::NetworkInterface",
       "Properties" : {
         "Description": "Public network interface",
@@ -1470,7 +1485,7 @@
       }
     },
 
-    "NovaNodeInterfaceManagement" : {
+    "ComputeInterfaceManagement" : {
       "Type" : "AWS::EC2::NetworkInterface",
       "Properties" : {
         "Description": "Management network interface",
@@ -1480,7 +1495,7 @@
       }
     },
 
-    "NovaNodeInterfaceData" : {
+    "ComputeInterfaceData" : {
       "Type" : "AWS::EC2::NetworkInterface",
       "Properties" : {
         "Description": "Data network interface",
@@ -1490,7 +1505,7 @@
       }
     },
 
-    "NovaNodeServer": {
+    "ComputeServer": {
       "Type": "AWS::EC2::Instance",
         "Metadata" : {
           "AWS::CloudFormation::Init" : {
@@ -1556,8 +1571,8 @@
                     "ec2_private_dns_show_ip=True\n",
                     "dmz_cidr=169.254.169.254/32\n",
                     "ec2_dmz_host=10.0.0.14\n",
-                    "metadata_host=10.0.0.14\n",
-                    "metadata_listen=0.0.0.0\n",
+                    "metadata_host=10.0.0.15\n",
+                    "metadata_listen=10.0.0.15\n",
                     "enabled_apis=emetadata\n",
 
                     "# Networking #\n",
@@ -1615,7 +1630,7 @@
                   "owner" : "ubuntu",
                   "group" : "ubuntu"
                 },
-                "/opt/osonaws/setup_novanode" : {
+                "/opt/osonaws/setup_compute" : {
                   "content" : { "Fn::Join" : ["", [
                     "#!/bin/bash -v\n",
 
@@ -1653,7 +1668,7 @@
                   "command" : "/opt/osonaws/setup_hypervisor"
                 },
                 "02_setup_nova_node" : {
-                  "command" : "/opt/osonaws/setup_novanode"
+                  "command" : "/opt/osonaws/setup_compute"
                 }
               }
             },
@@ -1747,15 +1762,15 @@
           "Tags" : [{ "Key" : "Name", "Value" : "Compute" }],
           "NetworkInterfaces" : [
             {
-              "NetworkInterfaceId" : {"Ref" : "NovaNodeInterfaceManagement"},
+              "NetworkInterfaceId" : {"Ref" : "ComputeInterfaceManagement"},
               "DeviceIndex" : "0"
             },
             {
-              "NetworkInterfaceId" : {"Ref" : "NovaNodeInterfacePublic"},
+              "NetworkInterfaceId" : {"Ref" : "ComputeInterfacePublic"},
               "DeviceIndex" : "1"
             },
             {
-              "NetworkInterfaceId" : {"Ref" : "NovaNodeInterfaceData"},
+              "NetworkInterfaceId" : {"Ref" : "ComputeInterfaceData"},
               "DeviceIndex" : "2"
             }],
           "Monitoring" : "false",
@@ -1792,22 +1807,24 @@
 
             "function error_exit\n",
             "{\n",
-            "  cfn-signal -e 1 -r \"$1\" '", { "Ref" : "NovaNodeWaitHandle" }, "'\n",
+            "  cfn-signal -e 1 -r \"$1\" '", { "Ref" : "ComputeWaitHandle" }, "'\n",
             "  exit 1\n",
             "}\n",
 
-            "cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r NovaNodeServer ",
+            "cfn-init -s ", { "Ref" : "AWS::StackName" }, " -r ComputeServer ",
             "    --access-key ",  { "Ref" : "OpenStackUserAccessKey" },
             "    --secret-key ", {"Fn::GetAtt": ["OpenStackUserAccessKey", "SecretAccessKey"]},
             "    --region ", { "Ref" : "AWS::Region" }, 
             "    --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
             "# All is well so signal success\n",
 
-            "cfn-signal -e 0 -r \"NovaNode setup complete\" '", { "Ref" : "NovaNodeWaitHandle" }, "'\n"
+            "cfn-signal -e 0 -r \"Compute setup complete\" '", { "Ref" : "ComputeWaitHandle" }, "'\n"
           ]]}
         }
-      }
+      },
+      "DependsOn" : "KeystoneServer"
     },
+
 
     "QuantumWaitHandle" : {
       "Type" : "AWS::CloudFormation::WaitConditionHandle"
@@ -1876,7 +1893,8 @@
               "packages" : {
                 "apt" : {
                   "quantum-plugin-openvswitch-agent"        : [],
-                  "quantum-dhcp-agent"                      : []
+                  "quantum-dhcp-agent"                      : [],
+                  "quantum-l3-agent"                        : []
                 }
               },
               "files" : {
@@ -1932,20 +1950,28 @@
                     "/etc/init.d/openvswitch-switch restart\n",
                     
                     "ovs-vsctl add-br br-int\n",
-                    "#ovs-vsctl add-br br-ex\n",
+                    "ovs-vsctl add-br br-ex\n",
                     "#ovs-vsctl add-port br-ex eth1\n",
-                    "#ip link set up br-ex\n",
+                    "ip link set up br-ex\n",
 
                     "sed -i 's/auth_host = 127.0.0.1/auth_host = 10.0.0.10/g' /etc/quantum/api-paste.ini\n",
                     "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/quantum/api-paste.ini\n",
                     "sed -i 's/%SERVICE_USER%/quantum/g' /etc/quantum/api-paste.ini\n",
                     "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "ServicePassword" }, "/g' /etc/quantum/api-paste.ini\n",
 
+                    "sed -i 's/127.0.0.1:35357/10.0.0.10:35357/g' /etc/quantum/l3_agent.ini\n",
+                    "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/quantum/l3_agent.ini\n",
+                    "sed -i 's/%SERVICE_USER%/quantum/g' /etc/quantum/l3_agent.ini\n",
+                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "ServicePassword" }, "/g' /etc/quantum/l3_agent.ini\n",
+                    "echo 'metadata_ip = 10.0.0.10\n",
+                    "use_namespaces=False' >> /etc/quantum/l3_agent.ini\n",
+
                     "echo 'use_namespaces = False' >> /etc/quantum/dhcp_agent.ini\n",
 
                     "chown -R quantum:quantum /etc/quantum\n",
                     "service quantum-plugin-openvswitch-agent restart\n",
                     "service quantum-dhcp-agent restart\n",
+                    "service quantum-l3-agent restart\n",
 
                     "echo 'source /opt/osonaws/quantumrc' >> /home/ubuntu/.bashrc\n"
                   ]]},
@@ -1968,8 +1994,8 @@
                     "tenant_name=\"", { "Ref" : "HorizonDemoProjectName" }, "\"\n",
                     "tenant_network_name=\"", { "Ref" : "HorizonDemoProjectName" }, "-net\"\n",
                     "prov_router_name='provider-router'\n",
-                    "fixed_range='10.5.5.0/24'\n",
-                    "network_gateway='10.5.5.1'\n",
+                    "fixed_range='10.0.100.0/24'\n",
+                    "network_gateway='10.0.1.1'\n",
                     "tenant_id=$(keystone tenant-list | grep \"$tenant_name\" | awk '{print $2}')\n",
 
                     "#Create net\n",
@@ -1984,9 +2010,16 @@
                     "ext_net_gateway='7.7.7.1'\n",
                     "pool_floating_start='7.7.7.130'\n",
                     "pool_floating_end='7.7.7.150'\n",
+                    "ext_net_bridge=br-ex\n",
 
                     "ext_net_id=$(get_id quantum net-create $ext_net_name -- --router:external=True --provider:network_type gre --provider:segmentation_id 2)\n",
-                    "quantum subnet-create --ip_version 4 --allocation-pool start=$pool_floating_start,end=$pool_floating_end --gateway $ext_net_gateway $ext_net_id $ext_net_cidr -- --enable_dhcp=False\n"
+                    "quantum subnet-create --ip_version 4 --allocation-pool start=$pool_floating_start,end=$pool_floating_end --gateway $ext_net_gateway $ext_net_id $ext_net_cidr -- --enable_dhcp=False\n",
+
+                    "router_id=$(get_id quantum router-show $prov_router_name)\n",
+                    "ext_net_id=$(get_id quantum net-show $ext_net_name)\n",
+                    "quantum router-gateway-set $router_id $ext_net_id \n",
+                    
+                    "ip addr flush dev $ext_net_bridge\n"
                   ]]},
                   "mode" : "000700",
                   "owner" : "ubuntu",
@@ -2051,12 +2084,8 @@
 
             "echo \"10.0.0.13 `hostname`\" >> /etc/hosts\n",
 
-              "#DEBUG\n",
-              "wget ", { "Ref" : "SSHprivateKeyURL" }, "\n",
-              "mv ./id_dsa /home/ubuntu/.ssh/\n",
-              "chown ubuntu:ubuntu /home/ubuntu/.ssh/id_dsa\n",
-              "chmod 700  /home/ubuntu/.ssh/id_dsa\n",
-               
+            "wget ", { "Ref" : "SSHpublicKeyURL" }, "\n",
+            "cat ./id_dsa.pub >> /home/ubuntu/.ssh/authorized_keys\n",
                
             "echo \"net.ipv4.ip_forward=1\n",
             "net.ipv4.conf.all.rp_filter = 0\n",
@@ -2087,7 +2116,8 @@
             "cfn-signal -e 0 -r \"Quantum setup complete\" '", { "Ref" : "QuantumWaitHandle" }, "'\n"
           ]]}
         }
-      }
+      },
+      "DependsOn" : "KeystoneServer"
     }
   },
 
@@ -2105,7 +2135,7 @@
       "Description" : "Nova public IP (API)"
     },
     "ComputeIP" : {
-      "Value" : { "Ref" : "NovaNodeIPAddress" },
+      "Value" : { "Ref" : "ComputeIPAddress" },
       "Description" : "Nova compute public IP (API)"
     },
     "CinderIP" : {
