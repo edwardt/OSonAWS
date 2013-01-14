@@ -103,17 +103,12 @@ Openstack ressources available by default :
 
 AWS ressources price :
 
-===== ========= ====== ============ ===========
-
-Type  Size     Number Price         Total
-
-EC2   t1.micro 5      0,020/hour    0,1
- 
-EC2   m1.large 3      0,26/hour     0,78
-
-EBS   standard 100 Go 0,10/Go/month 0,013
-
-===== ========= ====== ============ ===========
+===== ========= ====== ============= ===========
+Type  Size      Number Price         Total
+EC2   t1.micro  5      0,020/hour    0,1
+EC2   m1.large  3      0,26/hour     0,78
+EBS   standard  100 Go 0,10/Go/month 0,013
+===== ========= ====== ============= ===========
 
 Total : around 1$/hour with traffic.
 
