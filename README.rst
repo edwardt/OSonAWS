@@ -3,7 +3,7 @@
 ==========================================================
 
 :Version: 0.1 
-:Keywords: Multi node OpenStack, Folsom, Quantum, Nova, Keystone, Glance, Horizon, Cinder, OpenVSwitch, KVM, Ubuntu Server 12.04 (64 bits).
+:Keywords: Multi node OpenStack, Folsom, Quantum, Nova, Keystone, Glance, Horizon, Cinder, OpenVSwitch, Qemu, Ubuntu Server 12.04 (64 bits).
 :Launchpad: https://launchpad.net/osonaws
 :Status: Development
 
@@ -21,7 +21,7 @@ Table of Contents
 Authors
 ==========
 
-Copyright (C) Pierre FREUND <pierre.freund@gmail.com>
+Copyright (C) Pierre FREUND <pierre.freund@osones.com>
 
 1. What is it?
 ==============
