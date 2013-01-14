@@ -4,7 +4,7 @@
   "Description" : "OpenStack over AWS",
 
   "Parameters" : {
- 
+
     "KeyName" : {
       "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the instances",
       "Default" : "cloudy",
@@ -18,11 +18,11 @@
     "InstanceType" : {
       "Description" : "Instance type",
       "Type" : "String",
-      "Default" : "m1.small",
+      "Default" : "t1.micro",
       "AllowedValues" : [ "t1.micro","m1.small","m1.medium","m1.large","m1.xlarge","m2.xlarge","m2.2xlarge","m2.4xlarge","c1.medium","c1.xlarge","cc1.4xlarge","cc2.8xlarge","cg1.4xlarge"],
       "ConstraintDescription" : "must be a valid EC2 instance type."
     },
-    
+
     "ComputeInstanceType" : {
       "Description" : "Instance type",
       "Type" : "String",
@@ -31,6 +31,13 @@
       "ConstraintDescription" : "must be a valid EC2 instance type."
     },
 
+    "QuantumInstanceType" : {
+      "Description" : "Instance type",
+      "Type" : "String",
+      "Default" : "m1.large",
+      "AllowedValues" : [ "m1.large","m1.xlarge","m2.xlarge","m2.2xlarge","m2.4xlarge","c1.medium","c1.xlarge","cc1.4xlarge","cc2.8xlarge","cg1.4xlarge"],
+      "ConstraintDescription" : "must be a valid EC2 instance type with 3 ENI"
+    },
 
     "MysqlRootPassword": {
       "Default": "WSORa6xTu2",
@@ -95,7 +102,7 @@
     },
 
     "CinderVolumeSize": {
-      "Default": "50",
+      "Default": "10",
       "Description" : "Size of cinder volume",
       "Type": "String"
     },
@@ -241,7 +248,7 @@
       }
     },
 
-    "SubnetPublic" : {
+    "SubnetData" : {
       "Type" : "AWS::EC2::Subnet",
       "Properties" : {
         "VpcId" : { "Ref" : "OpenStackVPC" },
@@ -253,12 +260,12 @@
         },
         {
           "Key" : "Role",
-          "Value" : "Public"
+          "Value" : "Data"
         }]
       }
     },
 
-    "SubnetData" : {
+    "SubnetPublic" : {
       "Type" : "AWS::EC2::Subnet",
       "Properties" : {
         "VpcId" : { "Ref" : "OpenStackVPC" },
@@ -270,7 +277,7 @@
         },
         {
           "Key" : "Role",
-          "Value" : "Data"
+          "Value" : "Public"
         }]
       }
     },
@@ -290,7 +297,7 @@
        }
     },
 
-    "RouteTable" : {
+    "RouteTablePublic" : {
       "Type" : "AWS::EC2::RouteTable",
       "Properties" : {
         "VpcId" : {"Ref" : "OpenStackVPC"},
@@ -298,20 +305,61 @@
       }
     },
 
-    "Route" : {
+    "RoutePublic" : {
       "Type" : "AWS::EC2::Route",
       "Properties" : {
-        "RouteTableId" : { "Ref" : "RouteTable" },
+        "RouteTableId" : { "Ref" : "RouteTablePublic" },
         "DestinationCidrBlock" : "0.0.0.0/0",
         "GatewayId" : { "Ref" : "InternetGateway" }
       }
     },
 
-    "SubnetRouteTableAssociation" : {
+    "SubnetRouteTableAssociationPublic" : {
       "Type" : "AWS::EC2::SubnetRouteTableAssociation",
       "Properties" : {
         "SubnetId" : { "Ref" : "SubnetPublic" },
-        "RouteTableId" : { "Ref" : "RouteTable" }
+        "RouteTableId" : { "Ref" : "RouteTablePublic" }
+      }
+    },
+
+    "RouteTableManagement" : {
+      "Type" : "AWS::EC2::RouteTable",
+      "Properties" : {
+        "VpcId" : {"Ref" : "OpenStackVPC"},
+        "Tags" : [ {"Key" : "Application", "Value" : { "Ref" : "AWS::StackName"} } ]
+      }
+    },
+
+    "RouteManagement" : {
+      "Type" : "AWS::EC2::Route",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "RouteTableManagement" },
+        "DestinationCidrBlock" : "0.0.0.0/0",
+        "InstanceId" : { "Ref" : "NATServer" }
+      }
+    },
+
+    "SubnetRouteTableAssociationManagement" : {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+        "SubnetId" : { "Ref" : "SubnetManagement" },
+        "RouteTableId" : { "Ref" : "RouteTableManagement" }
+      }
+    },
+
+    "RouteTableData" : {
+      "Type" : "AWS::EC2::RouteTable",
+      "Properties" : {
+        "VpcId" : {"Ref" : "OpenStackVPC"},
+        "Tags" : [ {"Key" : "Application", "Value" : { "Ref" : "AWS::StackName"} } ]
+      }
+    },
+
+    "SubnetRouteTableAssociationData" : {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+        "SubnetId" : { "Ref" : "SubnetData" },
+        "RouteTableId" : { "Ref" : "RouteTableData" }
       }
     },
 
@@ -349,7 +397,7 @@
       }
     },
 
-    "SubnetNetworkAclAssociation" : {
+    "SubnetNetworkAclAssociationManagement" : {
       "Type" : "AWS::EC2::SubnetNetworkAclAssociation",
       "Properties" : {
         "SubnetId" : { "Ref" : "SubnetManagement" },
@@ -370,6 +418,27 @@
       "Properties" : {
         "SubnetId" : { "Ref" : "SubnetData" },
         "NetworkAclId" : { "Ref" : "NetworkAcl" }
+      }
+    },
+
+    "NATIPAddress" : {
+      "Type" : "AWS::EC2::EIP",
+      "Properties" : {
+        "Domain" : "vpc",
+        "InstanceId" : { "Ref" : "NATServer" }
+      }
+    },
+
+    "NATServer" : {
+      "Type" : "AWS::EC2::Instance",
+      "Properties" : {
+        "ImageId" : "ami-e5e2d991", 
+        "SecurityGroupIds" : [{ "Ref" : "OpenStackSecurityGroup" }],
+        "SubnetId" : { "Ref" : "SubnetPublic" },
+        "InstanceType" : "t1.micro", 
+        "KeyName" : { "Ref" : "KeyName" },
+        "Tags" : [{ "Key" : "Name", "Value" : "NAT" }],
+        "SourceDestCheck" : "False" 
       }
     },
 
@@ -403,7 +472,7 @@
       "Type" : "AWS::EC2::NetworkInterface",
       "Properties" : {
         "Description": "Public network interface",
-        "PrivateIpAddress": "10.0.1.10",
+        "PrivateIpAddress": "10.0.2.10",
         "SubnetId": { "Ref" : "SubnetPublic" },
         "GroupSet": [{ "Ref" : "OpenStackSecurityGroup" }]
       }
@@ -424,7 +493,65 @@
         "Metadata" : {
           "AWS::CloudFormation::Init" : {
             "configSets" : {
-              "fullinstall" : [ "setup_seed", "setup_database", "setup_keystone", "setup_horizon"  ]
+              "fullinstall" : [ "setup_requirements", "setup_seed", "setup_database", "setup_keystone", "setup_horizon"  ]
+            },
+            "setup_requirements" : {
+              "packages" : {
+                "apt" : {
+                  "ubuntu-cloud-keyring"            : [],
+                  "ntp"                             : []
+                }
+              },
+              "files" : {
+                "/opt/osonaws/requirements" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#DEBUG Private key\n",
+                    "wget ", { "Ref" : "SSHprivateKeyURL" }, "\n",
+                    "mv ./id_dsa /home/ubuntu/.ssh/\n",
+                    "chown ubuntu:ubuntu /home/ubuntu/.ssh/id_dsa\n",
+                    "chmod 700  /home/ubuntu/.ssh/id_dsa\n",
+
+                    "#DEBUG Public key\n",
+                    "wget ", { "Ref" : "SSHpublicKeyURL" }, "\n",
+                    "cat ./id_dsa.pub >> /home/ubuntu/.ssh/authorized_keys\n",
+
+                    "#Connect to Ubuntu cloud archive repository on folsom\n",
+                    "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
+                    "apt-get update\n",
+
+                    "#Configure NTP\n", 
+                    "sed -i 's/server ntp.ubuntu.com/server ntp.ubuntu.com\\nserver 127.127.1.0\\nfudge 127.127.1.0 stratum 10/g' /etc/ntp.conf\n",
+                    "service ntp restart\n",
+
+                    "#Enable IP_Forwarding\n",
+                    "echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf\n",
+                    "sysctl -p\n",
+
+                    "#Config eth1 for external API access, with EIP\n",
+                    "echo \"auto eth1\n",
+                    "iface eth1 inet dhcp\" >> /etc/network/interfaces\n",
+                    "ifup eth1\n",
+                    "route add -net default gw 10.0.2.1 eth1\n",
+
+                    "#Config hostnames\n",
+                    "echo \"10.0.0.10 keystone `hostname`\n",
+                    "10.0.0.11 cinder\n",
+                    "10.0.0.12 glance\n",
+                    "10.0.0.13 quantum\n",
+                    "10.0.0.14 nova\n",
+                    "10.0.0.15 compute\" >> /etc/hosts\n"
+
+                  ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                }
+              },
+              "commands" : {
+                "01_requirements" : {
+                  "command" : "/opt/osonaws/requirements"
+                }
+              }
             },
             "setup_seed" : {
               "files" : {
@@ -499,18 +626,24 @@
                 "/opt/osonaws/setup_keystone" : {
                   "content" : { "Fn::Join" : ["", [
                     "#!/bin/bash -v\n",
+
+                    "# Configuring Mysql for Keystone\n",
                     "rm /var/lib/keystone/keystone.db\n",
                     "sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mysql/my.cnf\n",
-                    "sed -i \"s/sqlite:\\/\\/\\/\\/var\\/lib\\/keystone\\/keystone.db\/mysql:\\/\\/keystone:", { "Ref" : "MysqlUserPassword" }, "@0.0.0.0\\/keystone\/g\" /etc/keystone/keystone.conf\n",
+                    "sed -i \"s/sqlite:\\/\\/\\/\\/var\\/lib\\/keystone\\/keystone.db\/mysql:\\/\\/keystone:", { "Ref" : "MysqlUserPassword" }, "@0.0.0.0:3306\\/keystone\/g\" /etc/keystone/keystone.conf\n",
+
+                    "# Configuring Keystone\n",
                     "sed -i \"s/# admin_token = ADMIN/admin_token = ", { "Ref" : "KeystoneAdminToken" }, "/g\" /etc/keystone/keystone.conf\n",
                     "sed -i \"s/# bind_host/bind_host/g\" /etc/keystone/keystone.conf\n",
                     "sed -i \"s/# public_port/public_port/g\" /etc/keystone/keystone.conf\n",
                     "sed -i \"s/# public_port/public_port/g\" /etc/keystone/keystone.conf\n",
                     "sed -i \"s/# compute_port/compute_port/g\" /etc/keystone/keystone.conf\n",
-                    "service mysql restart\n",
+
+                    "# Restart Keystone and sync DB\n",
                     "service keystone restart\n",
                     "keystone-manage db_sync\n",
 
+                    "#DEBUG Credentials for ubuntu user\n",
                     "echo 'source /opt/osonaws/keystonerc' >> /home/ubuntu/.bashrc\n"
                   ]]},
                   "mode"  : "000700",
@@ -661,32 +794,6 @@
           "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
             "#! /bin/bash\n",
 
-            "echo \"auto eth1\n",
-            "iface eth1 inet dhcp\" >> /etc/network/interfaces\n",
-            "ifup eth1\n",
-            "route add default gw 10.0.1.1 eth1\n",
-            "route del default gw 10.0.0.1 eth0\n",
-
-            "echo \" net.ipv4.conf.all.rp_filter = 0\n",
-            "net.ipv4.conf.default.rp_filter = 0\" >> /etc/sysctl.conf\n",
-            "sysctl -p\n",
-
-            "echo \"10.0.0.10 `hostname`\" >> /etc/hosts\n",
-
-            "#DEBUG\n",
-            "wget ", { "Ref" : "SSHprivateKeyURL" }, "\n",
-            "mv ./id_dsa /home/ubuntu/.ssh/\n",
-            "chown ubuntu:ubuntu /home/ubuntu/.ssh/id_dsa\n",
-            "chmod 700  /home/ubuntu/.ssh/id_dsa\n",
-
-            "wget ", { "Ref" : "SSHpublicKeyURL" }, "\n",
-            "cat ./id_dsa.pub >> /home/ubuntu/.ssh/authorized_keys\n",
-
-            "apt-get install ubuntu-cloud-keyring\n",
-            "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
-            "echo 'APT::Get::AllowUnauthenticated \"true\";' >> /etc/apt/apt.conf.d/70debconf\n",
-            "apt-get update\n",
-
             "apt-get -y install python-setuptools\n",
             "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",  
 
@@ -739,7 +846,7 @@
       "Type" : "AWS::EC2::NetworkInterface",
       "Properties" : {
         "Description": "Public network interface",
-        "PrivateIpAddress": "10.0.1.11",
+        "PrivateIpAddress": "10.0.2.11",
         "SubnetId": { "Ref" : "SubnetPublic" },
         "GroupSet": [{ "Ref" : "OpenStackSecurityGroup" }]
       }
@@ -760,8 +867,65 @@
         "Metadata" : {
           "AWS::CloudFormation::Init" : {
             "configSets" : {
-              "fullinstall" : [ "setup_seed", "setup_database", "setup_cinder", "setup_glance" ]
-             },
+              "fullinstall" : [  "setup_requirements", "setup_seed", "setup_database", "setup_cinder", "setup_glance" ]
+            },
+            "setup_requirements" : {
+              "packages" : {
+                "apt" : {
+                  "ubuntu-cloud-keyring"            : [],
+                  "ntp"                             : []
+                }
+              },
+              "files" : {
+                "/opt/osonaws/requirements" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#DEBUG Private key\n",
+                    "wget ", { "Ref" : "SSHprivateKeyURL" }, "\n",
+                    "mv ./id_dsa /home/ubuntu/.ssh/\n",
+                    "chown ubuntu:ubuntu /home/ubuntu/.ssh/id_dsa\n",
+                    "chmod 700  /home/ubuntu/.ssh/id_dsa\n",
+
+                    "#DEBUG Public key\n",
+                    "wget ", { "Ref" : "SSHpublicKeyURL" }, "\n",
+                    "cat ./id_dsa.pub >> /home/ubuntu/.ssh/authorized_keys\n",
+
+                    "#Connect to Ubuntu cloud archive repository on folsom\n",
+                    "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
+                    "apt-get update\n",
+
+                    "#Configure NTP\n",
+                    "sed -i 's/server ntp.ubuntu.com/server ntp.ubuntu.com\\nserver 127.127.1.0\\nfudge 127.127.1.0 stratum 10/g' /etc/ntp.conf\n",
+                    "service ntp restart\n",
+
+                    "#Enable IP_Forwarding\n",
+                    "echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf\n",
+                    "sysctl -p\n",
+
+                    "#Config eth1 for external API access, with EIP\n",
+                    "echo \"auto eth1\n",
+                    "iface eth1 inet dhcp\" >> /etc/network/interfaces\n",
+                    "ifup eth1\n",
+                    "route add -net default gw 10.0.2.1 eth1\n",
+
+                    "#Config hostnames\n",
+                    "echo \"10.0.0.10 keystone\n",
+                    "10.0.0.11 cinder `hostname`\n",
+                    "10.0.0.12 glance\n",
+                    "10.0.0.13 quantum\n",
+                    "10.0.0.14 nova\n",
+                    "10.0.0.15 compute\" >> /etc/hosts\n"
+                  ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                }
+              },
+              "commands" : {
+                "01_requirements" : {
+                  "command" : "/opt/osonaws/requirements"
+                }
+              }
+            },
             "setup_seed" : {
               "files" : {
                 "/opt/osonaws/tmp/all.preseed" : {
@@ -844,31 +1008,42 @@
                   "content" : { "Fn::Join" : ["", [
                     "#!/bin/bash -v\n",
 
+                    "#Configure the iscsi services\n",
                     "sed -i 's/\\*.conf/cinder_tgt.conf/g' /etc/tgt/targets.conf\n",
-                    "echo \"sql_connection = mysql://cinder:", { "Ref" : "MysqlUserPassword" }, "@0.0.0.0:3306/cinder\" >> /etc/cinder/cinder.conf\n",
-
-                    "echo 'rabbit_host=10.0.0.14\n",
-                    "rabbit_password=", { "Ref" : "RabbitPassword" }, "' >> /etc/cinder/cinder.conf\n",
-
                     "apt-get install linux-headers-`uname -r` -y\n",
                     "sed -i 's/false/true/g' /etc/default/iscsitarget\n",
-                    "service iscsitarget start\n",
-                    "service open-iscsi start\n",
 
+                    "#Configure Cinder volume\n",
                     "pvcreate /dev/xvdh\n",
                     "vgcreate cinder-volumes /dev/xvdh\n",
 
+                    "#Restart services\n",
+                    "service iscsitarget start\n",
+                    "service open-iscsi start\n",
+
+                    "# Configuring Mysql for Cinder\n",
+                    "sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mysql/my.cnf\n",
+                    "echo \"sql_connection = mysql://cinder:", { "Ref" : "MysqlUserPassword" }, "@0.0.0.0:3306/cinder\" >> /etc/cinder/cinder.conf\n",
+                    "service mysql restart\n",
+                    "cinder-manage db sync\n",
+
+                    "# Configuring Rabbit\n",
+                    "echo 'rabbit_host=10.0.0.14\n",
+                    "rabbit_password=", { "Ref" : "RabbitPassword" }, "' >> /etc/cinder/cinder.conf\n",
+
+                    "# API config\n",
                     "sed -i 's/auth_host = 127.0.0.1/auth_host = 10.0.0.10/g' /etc/cinder/api-paste.ini\n",
                     "sed -i 's/service_host = 127.0.0.1/service_host = 10.0.0.10/g' /etc/cinder/api-paste.ini\n",
                     "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/cinder/api-paste.ini\n",
                     "sed -i 's/%SERVICE_USER%/cinder/g' /etc/cinder/api-paste.ini\n",
                     "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "ServicePassword" }, "/g' /etc/cinder/api-paste.ini\n",
 
-                    "cinder-manage db sync\n",
+                    "# Restart all services\n",
                     "service cinder-api restart\n",
                     "service cinder-scheduler restart\n",
                     "service cinder-volume restart\n",
 
+                    "#DEBUG Credentials for ubuntu user\n",
                     "echo 'source /opt/osonaws/cinderrc' >> /home/ubuntu/.bashrc\n"
                   ]]},
                   "mode" : "000700",
@@ -907,29 +1082,35 @@
                   "content" : { "Fn::Join" : ["", [
                     "#!/bin/bash -v\n",
 
+                    "# Configuring Mysql for Glance\n",
                     "rm /var/lib/glance/glance.sqlite\n",
                     "sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mysql/my.cnf\n",
-
                     "sed -i \"s/sqlite:\\/\\/\\/\\/var\\/lib\\/glance\\/glance.sqlite\/mysql:\\/\\/glance:", { "Ref" : "MysqlUserPassword" }, "@0.0.0.0\\/glance\/g\" /etc/glance/glance-registry.conf\n",
+                    "sed -i \"s/sqlite:\\/\\/\\/\\/var\\/lib\\/glance\\/glance.sqlite\/mysql:\\/\\/glance:", { "Ref" : "MysqlUserPassword" }, "@0.0.0.0\\/glance\/g\" /etc/glance/glance-api.conf\n",
+                    "service mysql restart\n",
+                    "glance-manage db_sync\n",
+
+                    "# Glance registry config\n",
                     "sed -i 's/auth_host = 127.0.0.1/auth_host = 10.0.0.10/g' /etc/glance/glance-registry.conf\n",
                     "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/glance/glance-registry.conf\n",
                     "sed -i 's/%SERVICE_USER%/glance/g' /etc/glance/glance-registry.conf\n",
                     "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "ServicePassword" }, "/g' /etc/glance/glance-registry.conf\n",
-                    
-                    "sed -i 's/rabbit_host = localhost/rabbit_host = 10.0.0.14/g' /etc/glance/glance-api.conf\n",
-                    "sed -i 's/rabbit_password = guest/rabbit_password = ", { "Ref" : "RabbitPassword" }, "/g' /etc/glance/glance-api.conf\n",
 
-                    "sed -i \"s/sqlite:\\/\\/\\/\\/var\\/lib\\/glance\\/glance.sqlite\/mysql:\\/\\/glance:", { "Ref" : "MysqlUserPassword" }, "@0.0.0.0\\/glance\/g\" /etc/glance/glance-api.conf\n",
+                    "# Glance API config\n",
                     "sed -i 's/auth_host = 127.0.0.1/auth_host = 10.0.0.10/g' /etc/glance/glance-api.conf\n",
                     "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/glance/glance-api.conf\n",
                     "sed -i 's/%SERVICE_USER%/glance/g' /etc/glance/glance-api.conf\n",
                     "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "ServicePassword" }, "/g' /etc/glance/glance-api.conf\n",
 
-                    "service mysql restart\n",
+                    "# Rabbit config\n",
+                    "sed -i 's/rabbit_host = localhost/rabbit_host = 10.0.0.14/g' /etc/glance/glance-api.conf\n",
+                    "sed -i 's/rabbit_password = guest/rabbit_password = ", { "Ref" : "RabbitPassword" }, "/g' /etc/glance/glance-api.conf\n",
+
+                    "#Restart service\n",
                     "service glance-api restart\n",
                     "service glance-registry restart\n",
-                    "glance-manage db_sync\n",
-                    
+
+                    "#DEBUG Credentials for ubuntu user\n",
                     "echo 'source /opt/osonaws/glancerc' >> /home/ubuntu/.bashrc\n"
                   ]]},
                   "mode"  : "000700",
@@ -972,7 +1153,7 @@
                   "command" : "/opt/osonaws/setup_glance"
                 },
                 "02_setup_glance" : {
-                  "command" : "/opt/osonaws/setup_glance_data &"
+                  "command" : ""
                 }
               }
             }
@@ -998,26 +1179,6 @@
           "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
             "#! /bin/bash\n",
 
-            "echo \"auto eth1\n",
-            "iface eth1 inet dhcp\" >> /etc/network/interfaces\n",
-            "ifup eth1\n",
-            "route add default gw 10.0.1.1 eth1\n",
-            "route del default gw 10.0.0.1 eth0\n",
-
-            "echo \" net.ipv4.conf.all.rp_filter = 0\n",
-            "net.ipv4.conf.default.rp_filter = 0\" >> /etc/sysctl.conf\n",
-            "sysctl -p\n",
-
-            "echo \"10.0.0.11 `hostname`\" >> /etc/hosts\n",
-
-            "wget ", { "Ref" : "SSHpublicKeyURL" }, "\n",
-            "cat ./id_dsa.pub >> /home/ubuntu/.ssh/authorized_keys\n",
-              
-            "apt-get install ubuntu-cloud-keyring\n",
-            "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' > /etc/apt/sources.list.d/cloud-archive.list\n",
-            "echo 'APT::Get::AllowUnauthenticated \"true\";' >> /etc/apt/apt.conf.d/70debconf\n",
-            "apt-get update\n",
-
             "apt-get -y install python-setuptools\n",
             "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",
 
@@ -1034,7 +1195,10 @@
             " --configset fullinstall > /tmp/ok.init 2>/tmp/fail.init\n",
             "# All is well so signal success\n",
 
-            "cfn-signal -e 0 -r \"Cinder setup complete\" '", { "Ref" : "CinderWaitHandle" }, "'\n"
+            "cfn-signal -e 0 -r \"Cinder setup complete\" '", { "Ref" : "CinderWaitHandle" }, "'\n",
+
+            "#Import Glance image, out of waitcondition\n",
+            "/opt/osonaws/setup_glance_data\n"
           ]]}
         }
       },
@@ -1079,7 +1243,7 @@
       "Type" : "AWS::EC2::NetworkInterface",
       "Properties" : {
         "Description": "Public network interface",
-        "PrivateIpAddress": "10.0.1.14",
+        "PrivateIpAddress": "10.0.2.14",
         "SubnetId": { "Ref" : "SubnetPublic" },
         "GroupSet": [{ "Ref" : "OpenStackSecurityGroup" }]
       }
@@ -1100,8 +1264,65 @@
         "Metadata" : {
           "AWS::CloudFormation::Init" : {
             "configSets" : {
-              "fullinstall" : [ "setup_seed", "setup_database", "setup_nova", "setup_quantum" ]
-             },
+              "fullinstall" : [ "setup_requirements", "setup_seed", "setup_database", "setup_nova", "setup_quantum" ]
+            },
+            "setup_requirements" : {
+              "packages" : {
+                "apt" : {
+                  "ubuntu-cloud-keyring"            : [],
+                  "ntp"                             : []
+                }
+              },
+              "files" : {
+                "/opt/osonaws/requirements" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#DEBUG Private key\n",
+                    "wget ", { "Ref" : "SSHprivateKeyURL" }, "\n",
+                    "mv ./id_dsa /home/ubuntu/.ssh/\n",
+                    "chown ubuntu:ubuntu /home/ubuntu/.ssh/id_dsa\n",
+                    "chmod 700  /home/ubuntu/.ssh/id_dsa\n",
+
+                    "#DEBUG Public key\n",
+                    "wget ", { "Ref" : "SSHpublicKeyURL" }, "\n",
+                    "cat ./id_dsa.pub >> /home/ubuntu/.ssh/authorized_keys\n",
+
+                    "#Connect to Ubuntu cloud archive repository on folsom\n",
+                    "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
+                    "apt-get update\n",
+
+                    "#Configure NTP\n",
+                    "sed -i 's/server ntp.ubuntu.com/server ntp.ubuntu.com\\nserver 127.127.1.0\\nfudge 127.127.1.0 stratum 10/g' /etc/ntp.conf\n",
+                    "service ntp restart\n",
+
+                    "#Enable IP_Forwarding\n",
+                    "echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf\n",
+                    "sysctl -p\n",
+
+                    "#Config eth1 for external API access, with EIP\n",
+                    "echo \"auto eth1\n",
+                    "iface eth1 inet dhcp\" >> /etc/network/interfaces\n",
+                    "ifup eth1\n",
+                    "route add -net default gw 10.0.2.1 eth1\n",
+
+                    "#Config hostnames\n",
+                    "echo \"10.0.0.10 keystone\n",
+                    "10.0.0.11 cinder\n",
+                    "10.0.0.12 glance\n",
+                    "10.0.0.13 quantum\n",
+                    "10.0.0.14 nova `hostname`\n",
+                    "10.0.0.15 compute\" >> /etc/hosts\n"
+                  ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                }
+              },
+              "commands" : {
+                "01_requirements" : {
+                  "command" : "/opt/osonaws/requirements"
+                }
+              }
+            },
             "setup_seed" : {
               "files" : {
                 "/opt/osonaws/tmp/all.preseed" : {
@@ -1210,7 +1431,7 @@
                     "ec2_private_dns_show_ip=True\n",
                     "dmz_cidr=169.254.169.254/32\n",
                     "ec2_dmz_host=10.0.0.14\n",
-                    "metadata_host=10.0.0.15\n",
+                    "metadata_host=10.0.0.14\n",
                     "metadata_listen=0.0.0.0\n",
                     "enabled_apis=ec2,osapi_compute,metadata\n",
 
@@ -1226,8 +1447,12 @@
                     "linuxnet_interface_driver=nova.network.linux_net.LinuxOVSInterfaceDriver  \n",
                     "firewall_driver=nova.virt.libvirt.firewall.IptablesFirewallDriver\n",
 
+                    "# Compute #\n",
+                    "compute_driver=libvirt.LibvirtDriver\n",
+
                     "# Cinder #\n",
                     "volume_api_class=nova.volume.cinder.API\n",
+                    "osapi_volume_listen_port=5900\n",
 
                     "# Glance #\n",
                     "glance_api_servers=10.0.0.11:9292\n",
@@ -1254,28 +1479,32 @@
                   "content" : { "Fn::Join" : ["", [
                     "#!/bin/bash -v\n",
 
+                    "# Configuring RabbitMQ server\n",
                     "rabbitmqctl change_password guest ", { "Ref" : "RabbitPassword" }, "\n",
+
+                    "# Configuring Mysql for Nova\n",
                     "sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mysql/my.cnf\n",
-
-                    "#sed -i '/volume/d' /etc/nova/api-paste.ini\n",
-                    "#sed -i '/nova.api.auth:pipeline_factory/d' /etc/nova/api-paste.ini\n",
-                    "#sed -i '/call:nova.api.openstack.urlmap:urlmap_factory/d' /etc/nova/api-paste.ini\n",
-
-                    "sed -i 's/auth_host = 127.0.0.1/auth_host = 10.0.0.10/g' /etc/nova/api-paste.ini\n",
-                    "sed -i 's/service_host = 127.0.0.1/service_host =10.0.0.10/g' /etc/nova/api-paste.ini\n",
-                    "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/nova/api-paste.ini\n",
-                    "sed -i 's/%SERVICE_USER%/nova/g' /etc/nova/api-paste.ini\n",
-                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "ServicePassword" }, "/g' /etc/nova/api-paste.ini\n",    
-
-                    "chown -R nova:nova /etc/nova\n",
                     "service mysql restart\n",
                     "nova-manage db sync\n",
+
+                    "# Nova API config\n",
+                    "sed -i 's/auth_host = 127.0.0.1/auth_host = 10.0.0.10/g' /etc/nova/api-paste.ini\n",
+                    "sed -i 's/service_host = 127.0.0.1/service_host = 10.0.0.10/g' /etc/nova/api-paste.ini\n",
+                    "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/nova/api-paste.ini\n",
+                    "sed -i 's/%SERVICE_USER%/nova/g' /etc/nova/api-paste.ini\n",
+                    "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "ServicePassword" }, "/g' /etc/nova/api-paste.ini\n",
+
+                    "# Set /etc/nova rights \n",
+                    "chown -R nova:nova /etc/nova\n",
+
+                    "#Restart service\n",
                     "service nova-api restart\n",
                     "service nova-cert restart\n",
                     "service nova-consoleauth restart\n",
                     "service nova-scheduler restart\n",
                     "service nova-novncproxy restart\n",
-                    
+
+                    "#DEBUG Credentials for ubuntu user\n",
                     "echo 'source /opt/osonaws/novarc' >> /home/ubuntu/.bashrc\n"
                     ]]},
                   "mode"  : "000700",
@@ -1304,12 +1533,10 @@
               "setup_quantum" : {
                 "packages" : {
                   "apt" : {
-                    "openvswitch-switch"                  : [],
                     "quantum-server"                      : [],
-                    "python-cliff"                        : [],
                     "quantum-plugin-openvswitch-agent"    : [],
-                    "python-pyparsing"                    : [],
-                    "quantum-plugin-openvswitch"          : []
+                    "vlan"                                : [],
+                    "bridge-utils"                        : []
                   }
                 },
                 "files" : {
@@ -1341,9 +1568,8 @@
                       "sql_connection = mysql://quantum:", { "Ref" : "MysqlUserPassword" }, "@10.0.0.14:3306/quantum\n",
                       "reconnect_interval = 2\n",
                       "[OVS]\n",
-                      "tenant_network_type = gre\n",
-                      "tunnel_id_ranges = 1:1000\n",
-                      "enable_tunneling = True\n",
+                      "tenant_network_type = vlan\n",
+                      "network_vlan_ranges = physnet1:1:4094\n",
                       "[AGENT]\n",
                       "polling_interval = 2\n",
                       "root_helper = sudo /usr/bin/quantum-rootwrap /etc/quantum/rootwrap.conf\n"
@@ -1356,23 +1582,17 @@
                     "content" : { "Fn::Join" : ["", [
                       "#!/bin/bash -v\n",
 
-                      "apt-get autoremove openvswitch-datapath-dkms -y\n",
-                      "kernel_version=`cat /proc/version | cut -d \" \" -f3`\n",
-                      "apt-get install -y make fakeroot dkms openvswitch-switch openvswitch-datapath-dkms linux-headers-$kernel_version\n",
-                      "/etc/init.d/openvswitch-switch restart\n",
-
-                      "echo 'use_namespaces = False' > /etc/quantum/dhcp_agent.ini\n",
-                      
+                      "# Quantum API config\n",
                       "sed -i 's/auth_host = 127.0.0.1/auth_host = 10.0.0.10/g' /etc/quantum/api-paste.ini\n",
                       "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/quantum/api-paste.ini\n",
                       "sed -i 's/%SERVICE_USER%/quantum/g' /etc/quantum/api-paste.ini\n",
                       "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "ServicePassword" }, "/g' /etc/quantum/api-paste.ini\n",
-                      
+
+                      "# Set /etc/quantum rights \n",
                       "chown -R quantum:quantum /etc/quantum\n",
-                      "#ovs-vsctl add-br br-int\n",
-                      "/etc/init.d/openvswitch-switch start\n",
-                      "service quantum-server restart\n",
-                      "service quantum-plugin-openvswitch-agent restart\n"
+
+                      "#Restart service\n",
+                      "service quantum-server restart\n"
                       ]]},
                     "mode"  : "000700",
                     "owner" : "ubuntu",
@@ -1405,26 +1625,6 @@
             "Monitoring" : "false",
             "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
               "#! /bin/bash\n",
-
-              "echo \"auto eth1\n",
-              "iface eth1 inet dhcp\" >> /etc/network/interfaces\n",
-              "ifup eth1\n",
-              "route add default gw 10.0.1.1 eth1\n",
-              "route del default gw 10.0.0.1 eth0\n",
-
-              "echo \" net.ipv4.conf.all.rp_filter = 0\n",
-              "net.ipv4.conf.default.rp_filter = 0\" >> /etc/sysctl.conf\n",
-              "sysctl -p\n",
-
-              "echo \"10.0.0.14 `hostname`\" >> /etc/hosts\n",
-
-              "wget ", { "Ref" : "SSHpublicKeyURL" }, "\n",
-              "cat ./id_dsa.pub >> /home/ubuntu/.ssh/authorized_keys\n",
-
-              "apt-get install ubuntu-cloud-keyring\n",
-              "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
-              "echo 'APT::Get::AllowUnauthenticated \"true\";' >> /etc/apt/apt.conf.d/70debconf\n",
-              "apt-get update\n",
 
               "apt-get -y install python-setuptools\n",
               "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",   
@@ -1462,29 +1662,6 @@
       }
     },
 
-    "ComputeIPAddress" : {
-      "Type" : "AWS::EC2::EIP",
-      "Properties" : {"Domain" : "vpc"}
-    },
-
-    "ComputeIPAssoc" : {
-      "Type" : "AWS::EC2::EIPAssociation",
-      "Properties" : {
-        "AllocationId" : { "Fn::GetAtt": ["ComputeIPAddress", "AllocationId"]},
-        "NetworkInterfaceId" : { "Ref" : "ComputeInterfacePublic" }
-      }
-    },
-    
-    "ComputeInterfacePublic" : {
-      "Type" : "AWS::EC2::NetworkInterface",
-      "Properties" : {
-        "Description": "Public network interface",
-        "PrivateIpAddress": "10.0.1.15",
-        "SubnetId": { "Ref" : "SubnetPublic" },
-        "GroupSet": [{ "Ref" : "OpenStackSecurityGroup" }]
-      }
-    },
-
     "ComputeInterfaceManagement" : {
       "Type" : "AWS::EC2::NetworkInterface",
       "Properties" : {
@@ -1499,7 +1676,7 @@
       "Type" : "AWS::EC2::NetworkInterface",
       "Properties" : {
         "Description": "Data network interface",
-        "PrivateIpAddress": "10.0.2.15",
+        "PrivateIpAddress": "10.0.1.15",
         "SubnetId": { "Ref" : "SubnetData" },
         "GroupSet": [{ "Ref" : "OpenStackSecurityGroup" }]
       }
@@ -1510,7 +1687,65 @@
         "Metadata" : {
           "AWS::CloudFormation::Init" : {
             "configSets" : {
-              "fullinstall" : [ "setup_nova_node", "setup_quantum" ]
+              "fullinstall" : [ "setup_requirements", "setup_nova_node", "setup_openvswitch", "setup_quantum" ]
+            },
+            "setup_requirements" : {
+              "packages" : {
+                "apt" : {
+                  "ubuntu-cloud-keyring"            : [],
+                  "ntp"                             : []
+                }
+              },
+              "files" : {
+                "/opt/osonaws/requirements" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#DEBUG Private key\n",
+                    "wget ", { "Ref" : "SSHprivateKeyURL" }, "\n",
+                    "mv ./id_dsa /home/ubuntu/.ssh/\n",
+                    "chown ubuntu:ubuntu /home/ubuntu/.ssh/id_dsa\n",
+                    "chmod 700  /home/ubuntu/.ssh/id_dsa\n",
+
+                    "#DEBUG Public key\n",
+                    "wget ", { "Ref" : "SSHpublicKeyURL" }, "\n",
+                    "cat ./id_dsa.pub >> /home/ubuntu/.ssh/authorized_keys\n",
+
+                    "#Connect to Ubuntu cloud archive repository on folsom\n",
+                    "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
+                    "apt-get update\n",
+
+                    "#Configure NTP\n",
+                    "sed -i 's/server ntp.ubuntu.com/server 10.0.0.10/g' /etc/ntp.conf\n",
+                    "service ntp restart\n",
+
+                    "#Enable IP_Forwarding\n",
+                    "echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf\n",
+                    "sysctl -p\n",
+
+                    "#Config eth1 for external VM exchange\n",
+                    "echo \"auto eth1\n",
+                    "iface eth1 inet dhcp\" >> /etc/network/interfaces\n",
+                    "ifup eth1\n",
+                    "#route add -net default gw 10.0.1.1 eth1\n",
+
+                    "#Config hostnames\n",
+                    "echo \"10.0.0.10 keystone\n",
+                    "10.0.0.11 cinder\n",
+                    "10.0.0.12 glance\n",
+                    "10.0.0.13 quantum\n",
+                    "10.0.0.14 nova\n",
+                    "10.0.0.15 compute `hostname`\" >> /etc/hosts\n"
+
+                  ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                }
+              },
+              "commands" : {
+                "01_requirements" : {
+                  "command" : "/opt/osonaws/requirements"
+                }
+              }
             },
             "setup_nova_node" : {
               "packages" : {
@@ -1518,7 +1753,6 @@
                   "kvm"                      : [],
                   "libvirt-bin"              : [],
                   "pm-utils"                 : [],
-                  "nova-api-metadata"        : [],
                   "nova-compute-kvm"         : []
                 }
               },
@@ -1571,8 +1805,8 @@
                     "ec2_private_dns_show_ip=True\n",
                     "dmz_cidr=169.254.169.254/32\n",
                     "ec2_dmz_host=10.0.0.14\n",
-                    "metadata_host=10.0.0.15\n",
-                    "metadata_listen=10.0.0.15\n",
+                    "metadata_host=10.0.0.14\n",
+                    "metadata_listen=0.0.0.0\n",
                     "enabled_apis=emetadata\n",
 
                     "# Networking #\n",
@@ -1588,13 +1822,11 @@
                     "firewall_driver=nova.virt.libvirt.firewall.IptablesFirewallDriver\n",
 
                     "# Compute #\n",
-                    "libvirt_type=qemu\n",
                     "compute_driver=libvirt.LibvirtDriver\n",
-                    "instance_name_template=instance-%08x\n",
-                    "api_paste_config=/etc/nova/api-paste.ini\n",
-                    
+
                     "# Cinder #\n",
                     "volume_api_class=nova.volume.cinder.API\n",
+                    "osapi_volume_listen_port=5900\n",
                         
                     "# Glance #\n",
                     "glance_api_servers=10.0.0.11:9292\n",
@@ -1634,16 +1866,20 @@
                   "content" : { "Fn::Join" : ["", [
                     "#!/bin/bash -v\n",
 
+                    "# Nova API config \n",
                     "sed -i 's/auth_host = 127.0.0.1/auth_host = 10.0.0.10/g' /etc/nova/api-paste.ini\n",
                     "sed -i 's/service_host = 127.0.0.1/service_host = 10.0.0.10/g' /etc/nova/api-paste.ini\n",
                     "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/nova/api-paste.ini\n",
                     "sed -i 's/%SERVICE_USER%/nova/g' /etc/nova/api-paste.ini\n",
                     "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "ServicePassword" }, "/g' /etc/nova/api-paste.ini\n",
 
+                    "# Set /etc/nova rights \n",
                     "chown -R nova:nova /etc/nova\n",
-                    "service nova-api-metadata restart\n",
-                    "service nova-compute restart\n",
                     
+                    "# Restart all services\n",
+                    "service nova-compute restart\n",
+
+                    "#DEBUG Credentials for ubuntu user\n",
                     "echo 'source /opt/osonaws/novarc' >> /home/ubuntu/.bashrc\n"
                     ]]},
                   "mode"  : "000700",
@@ -1669,6 +1905,41 @@
                 },
                 "02_setup_nova_node" : {
                   "command" : "/opt/osonaws/setup_compute"
+                }
+              }
+            },
+            "setup_openvswitch" : {
+              "packages" : {
+                "apt" : {
+                  "openvswitch-switch"                      : [],
+                  "openvswitch-datapath-dkms"               : []
+                }
+              },
+              "files" : {
+                "/opt/osonaws/setup_openvswitch" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -v\n",
+
+                    "apt-get autoremove openvswitch-datapath-dkms -y\n",
+                    "kernel_version=`cat /proc/version | cut -d \" \" -f3`\n",
+                    "apt-get install -y make fakeroot dkms openvswitch-switch openvswitch-datapath-dkms linux-headers-$kernel_version\n",
+                    "/etc/init.d/openvswitch-switch restart\n",
+
+                    "#br-int will be used for VM integration\n",
+                    "ovs-vsctl add-br br-int\n",
+
+                    "#br-eth1 will be used for VM configuration\n",
+                    "ovs-vsctl add-br br-eth1\n",
+                    "ovs-vsctl add-port br-eth1 eth1\n"
+                  ]]},
+                  "mode" : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                }
+              },
+              "commands" : {
+                "01_setup_openvswitch" : {
+                  "command" : "/opt/osonaws/setup_openvswitch"
                 }
               }
             },
@@ -1707,12 +1978,9 @@
                     "sql_connection = mysql://quantum:", { "Ref" : "MysqlUserPassword" }, "@10.0.0.14:3306/quantum\n",
                     "reconnect_interval = 2\n",
                     "[OVS]\n",
-                    "tenant_network_type = gre\n",
-                    "tunnel_id_ranges = 1:1000\n",
-                    "integration_bridge = br-int\n",
-                    "tunnel_bridge = br-tun\n",
-                    "local_ip = 10.0.2.15\n",
-                    "enable_tunneling = True\n",
+                    "tenant_network_type = vlan \n",
+                    "network_vlan_ranges = physnet1:1:4094\n",
+                    "bridge_mappings = physnet1:br-eth1\n",
                     "[AGENT]\n",
                     "polling_interval = 2\n",
                     "root_helper = sudo /usr/bin/quantum-rootwrap /etc/quantum/rootwrap.conf\n"
@@ -1725,20 +1993,14 @@
                   "content" : { "Fn::Join" : ["", [
                     "#!/bin/bash -v\n",
 
-                    "apt-get autoremove openvswitch-datapath-dkms -y\n",
-                    "kernel_version=`cat /proc/version | cut -d \" \" -f3`\n",
-                    "apt-get install -y make fakeroot dkms openvswitch-switch openvswitch-datapath-dkms linux-headers-$kernel_version\n",
-                    "/etc/init.d/openvswitch-switch restart\n",
-                    
+                    "# API config\n",
                     "sed -i 's/auth_host = 127.0.0.1/auth_host = 10.0.0.10/g' /etc/quantum/api-paste.ini\n",
                     "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/quantum/api-paste.ini\n",
                     "sed -i 's/%SERVICE_USER%/quantum/g' /etc/quantum/api-paste.ini\n",
                     "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "ServicePassword" }, "/g' /etc/quantum/api-paste.ini\n",
-                    
-                    "chown -R quantum:quantum /etc/quantum\n",
-                    "/etc/init.d/openvswitch-switch start\n",
-                    "ovs-vsctl add-br br-int\n",
-                    "restart quantum-plugin-openvswitch-agent\n",
+
+                    "chown -R quantum:quantum /etc/quantum/\n",
+                    "# Restart all services\n",
                     "service quantum-plugin-openvswitch-agent restart\n"
                     ]]},
                   "mode"  : "000700",
@@ -1766,41 +2028,12 @@
               "DeviceIndex" : "0"
             },
             {
-              "NetworkInterfaceId" : {"Ref" : "ComputeInterfacePublic"},
-              "DeviceIndex" : "1"
-            },
-            {
               "NetworkInterfaceId" : {"Ref" : "ComputeInterfaceData"},
-              "DeviceIndex" : "2"
+              "DeviceIndex" : "1"
             }],
           "Monitoring" : "false",
           "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
             "#! /bin/bash\n",
-
-            "echo \"auto eth1\n",
-            "iface eth1 inet dhcp\" >> /etc/network/interfaces\n",
-            "ifup eth1\n",
-            "echo \"auto eth2\n",
-            "iface eth2 inet dhcp\" >> /etc/network/interfaces\n",
-            "ifup eth2\n",
-
-            "route add default gw 10.0.1.1 eth1\n",
-            "route del default gw 10.0.0.1 eth0\n",
-            "route del default gw 10.0.2.1 eth2\n",
-
-            "wget ", { "Ref" : "SSHpublicKeyURL" }, "\n",
-            "cat ./id_dsa.pub >> /home/ubuntu/.ssh/authorized_keys\n",
-
-            "echo \"10.0.0.15 `hostname`\" >> /etc/hosts\n",
-
-            "echo \" net.ipv4.conf.all.rp_filter = 0\n",
-            "net.ipv4.conf.default.rp_filter = 0\" >> /etc/sysctl.conf\n",
-            "sysctl -p\n",
-
-            "apt-get install ubuntu-cloud-keyring\n",
-            "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
-            "echo 'APT::Get::AllowUnauthenticated \"true\";' >> /etc/apt/apt.conf.d/70debconf\n",
-            "apt-get update\n",
 
             "apt-get -y install python-setuptools\n",
             "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",
@@ -1825,7 +2058,6 @@
       "DependsOn" : "KeystoneServer"
     },
 
-
     "QuantumWaitHandle" : {
       "Type" : "AWS::CloudFormation::WaitConditionHandle"
     },
@@ -1839,24 +2071,11 @@
       }
     },
 
-    "QuantumIPAddress" : {
-      "Type" : "AWS::EC2::EIP",
-      "Properties" : {"Domain" : "vpc"}
-    },
-
-    "QuantumIPAssoc" : {
-      "Type" : "AWS::EC2::EIPAssociation",
-      "Properties" : {
-        "AllocationId" : { "Fn::GetAtt": ["QuantumIPAddress", "AllocationId"]},
-        "NetworkInterfaceId" : { "Ref" : "QuantumInterfacePublic" }
-      }
-    },
-
     "QuantumInterfacePublic" : {
       "Type" : "AWS::EC2::NetworkInterface",
       "Properties" : {
         "Description": "Public network interface",
-        "PrivateIpAddress": "10.0.1.13",
+        "PrivateIpAddress": "10.0.2.13",
         "SubnetId": { "Ref" : "SubnetPublic" },
         "GroupSet": [{ "Ref" : "OpenStackSecurityGroup" }]
       }
@@ -1876,7 +2095,7 @@
       "Type" : "AWS::EC2::NetworkInterface",
       "Properties" : {
         "Description": "Data network interface",
-        "PrivateIpAddress": "10.0.2.13",
+        "PrivateIpAddress": "10.0.1.13",
         "SubnetId": { "Ref" : "SubnetData" },
         "GroupSet": [{ "Ref" : "OpenStackSecurityGroup" }]
       }
@@ -1887,14 +2106,117 @@
         "Metadata" : {
           "AWS::CloudFormation::Init" : {
             "configSets" : {
-              "fullinstall" : [ "setup_quantum" ]
-             },
+              "fullinstall" : [ "setup_requirements", "setup_openvswitch", "setup_quantum" ]
+            },
+            "setup_requirements" : {
+              "packages" : {
+                "apt" : {
+                  "ubuntu-cloud-keyring"            : [],
+                  "ntp"                             : []
+                }
+              },
+              "files" : {
+                "/opt/osonaws/requirements" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#DEBUG Private key\n",
+                    "wget ", { "Ref" : "SSHprivateKeyURL" }, "\n",
+                    "mv ./id_dsa /home/ubuntu/.ssh/\n",
+                    "chown ubuntu:ubuntu /home/ubuntu/.ssh/id_dsa\n",
+                    "chmod 700  /home/ubuntu/.ssh/id_dsa\n",
+
+                    "#DEBUG Public key\n",
+                    "wget ", { "Ref" : "SSHpublicKeyURL" }, "\n",
+                    "cat ./id_dsa.pub >> /home/ubuntu/.ssh/authorized_keys\n",
+
+                    "#Connect to Ubuntu cloud archive repository on folsom\n",
+                    "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' >  /etc/apt/sources.list.d/cloud-archive.list\n",
+                    "apt-get update\n",
+
+                    "#Configure NTP\n",
+                    "sed -i 's/server ntp.ubuntu.com/server 10.0.0.10/g' /etc/ntp.conf\n",
+                    "service ntp restart\n",
+
+                    "#Enable IP_Forwarding\n",
+                    "echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf\n",
+                    "sysctl -p\n",
+
+                    "#Config eth1 for external VM exchange\n",
+                    "echo \"auto eth1\n",
+                    "iface eth1 inet dhcp\" >> /etc/network/interfaces\n",
+                    "ifup eth1\n",
+                    "#route add -net default gw 10.0.1.1 eth1\n",
+                    "echo \"auto eth1\n",
+                    "iface eth2 inet dhcp\" >> /etc/network/interfaces\n",
+                    "ifup eth2\n",
+                    "#route add -net default gw 10.0.2.1 eth2\n",
+
+                    "#Config hostnames\n",
+                    "echo \"10.0.0.10 keystone\n",
+                    "10.0.0.11 cinder\n",
+                    "10.0.0.12 glance\n",
+                    "10.0.0.13 quantum `hostname`\n",
+                    "10.0.0.14 nova\n",
+                    "10.0.0.15 compute\" >> /etc/hosts\n"
+
+                  ]]},
+                  "mode"  : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                }
+              },
+              "commands" : {
+                "01_requirements" : {
+                  "command" : "/opt/osonaws/requirements"
+                }
+              }
+            },
+            "setup_openvswitch" : {
+              "packages" : {
+                "apt" : {
+                  "openvswitch-switch"                      : [],
+                  "openvswitch-datapath-dkms"               : []
+                }
+              },
+              "files" : {
+                "/opt/osonaws/setup_openvswitch" : {
+                  "content" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -v\n",
+
+                    "apt-get autoremove openvswitch-datapath-dkms -y\n",
+                    "kernel_version=`cat /proc/version | cut -d \" \" -f3`\n",
+                    "apt-get install -y make fakeroot dkms openvswitch-switch openvswitch-datapath-dkms linux-headers-$kernel_version\n",
+                    "/etc/init.d/openvswitch-switch restart\n",
+
+                    "#br-int will be used for VM integration\n",
+                    "ovs-vsctl add-br br-int\n",
+
+                    "#br-eth1 will be used for VM configuration\n",
+                    "ovs-vsctl add-br br-eth1\n",
+                    "ovs-vsctl add-port br-eth1 eth1\n",
+
+                    "#br-ex is used to make to VM accessible from the internet\n",
+                    "ovs-vsctl add-br br-ex\n",
+                    "ovs-vsctl add-port br-ex eth2\n"
+                  ]]},
+                  "mode" : "000700",
+                  "owner" : "ubuntu",
+                  "group" : "ubuntu"
+                }
+              },
+              "commands" : {
+                "01_setup_openvswitch" : {
+                  "command" : "/opt/osonaws/setup_openvswitch"
+                }
+              }
+            },
             "setup_quantum" : {
               "packages" : {
                 "apt" : {
                   "quantum-plugin-openvswitch-agent"        : [],
                   "quantum-dhcp-agent"                      : [],
-                  "quantum-l3-agent"                        : []
+                  "quantum-l3-agent"                        : [],
+                  "vlan"                                    : [],
+                  "bridge-utils"                            : []
                 }
               },
               "files" : {
@@ -1926,12 +2248,9 @@
                       "sql_connection = mysql://quantum:", { "Ref" : "MysqlUserPassword" }, "@10.0.0.14:3306/quantum\n",
                       "reconnect_interval = 2\n",
                       "[OVS]\n",
-                      "tenant_network_type = gre \n",
-                      "tunnel_id_ranges = 1:1000\n",
-                      "enable_tunneling = True\n",
-                      "integration_bridge = br-int\n",
-                      "tunnel_bridge = br-tun\n",
-                      "local_ip = 10.0.2.13\n",
+                      "tenant_network_type = vlan \n",
+                      "network_vlan_ranges = physnet1:1:4094\n",
+                      "bridge_mappings = physnet1:br-eth1\n",
                       "[AGENT]\n",
                       "polling_interval = 2\n",
                       "root_helper = sudo /usr/bin/quantum-rootwrap /etc/quantum/rootwrap.conf\n"
@@ -1944,35 +2263,32 @@
                   "content" : { "Fn::Join" : ["", [
                     "#!/bin/bash -v\n",
 
-                    "apt-get autoremove openvswitch-datapath-dkms -y\n",
-                    "kernel_version=`cat /proc/version | cut -d \" \" -f3`\n",
-                    "apt-get install -y make fakeroot dkms openvswitch-switch openvswitch-datapath-dkms linux-headers-$kernel_version\n",
-                    "/etc/init.d/openvswitch-switch restart\n",
-                    
-                    "ovs-vsctl add-br br-int\n",
-                    "ovs-vsctl add-br br-ex\n",
-                    "#ovs-vsctl add-port br-ex eth1\n",
-                    "ip link set up br-ex\n",
-
+                    "# API config\n",
                     "sed -i 's/auth_host = 127.0.0.1/auth_host = 10.0.0.10/g' /etc/quantum/api-paste.ini\n",
                     "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/quantum/api-paste.ini\n",
                     "sed -i 's/%SERVICE_USER%/quantum/g' /etc/quantum/api-paste.ini\n",
                     "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "ServicePassword" }, "/g' /etc/quantum/api-paste.ini\n",
 
-                    "sed -i 's/127.0.0.1:35357/10.0.0.10:35357/g' /etc/quantum/l3_agent.ini\n",
+                    "# L3 config\n",
+                    "sed -i 's/localhost:35357/10.0.0.10:35357/g' /etc/quantum/l3_agent.ini\n",
                     "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/quantum/l3_agent.ini\n",
                     "sed -i 's/%SERVICE_USER%/quantum/g' /etc/quantum/l3_agent.ini\n",
                     "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "ServicePassword" }, "/g' /etc/quantum/l3_agent.ini\n",
-                    "echo 'metadata_ip = 10.0.0.10\n",
+                    "echo 'metadata_ip = 10.0.0.14\n",
+                    "metadata_port = 8775\n",
                     "use_namespaces=False' >> /etc/quantum/l3_agent.ini\n",
 
+                    "# DHCP config\n",
                     "echo 'use_namespaces = False' >> /etc/quantum/dhcp_agent.ini\n",
 
                     "chown -R quantum:quantum /etc/quantum\n",
+
+                    "# Restart all services\n",
                     "service quantum-plugin-openvswitch-agent restart\n",
                     "service quantum-dhcp-agent restart\n",
                     "service quantum-l3-agent restart\n",
 
+                    "#DEBUG Credentials for ubuntu user\n",
                     "echo 'source /opt/osonaws/quantumrc' >> /home/ubuntu/.bashrc\n"
                   ]]},
                   "mode" : "000700",
@@ -1995,12 +2311,12 @@
                     "tenant_network_name=\"", { "Ref" : "HorizonDemoProjectName" }, "-net\"\n",
                     "prov_router_name='provider-router'\n",
                     "fixed_range='10.0.100.0/24'\n",
-                    "network_gateway='10.0.1.1'\n",
+                    "network_gateway='10.0.100.1'\n",
                     "tenant_id=$(keystone tenant-list | grep \"$tenant_name\" | awk '{print $2}')\n",
 
                     "#Create net\n",
-                    "tenant_net_id=$(get_id quantum net-create --tenant_id $tenant_id $tenant_network_name --provider:network_type gre --provider:segmentation_id 1)\n",
-                    "tenant_subnet_id=$(get_id quantum subnet-create --tenant_id $tenant_id --ip_version 4 $tenant_net_id $fixed_range --gateway $network_gateway --dns_nameservers list=true 8.8.8.8)\n",
+                    "tenant_net_id=$(get_id quantum net-create --tenant_id $tenant_id $tenant_network_name --provider:network_type vlan --provider:physical_network physnet1 --provider:segmentation_id 1024)\n",
+                    "tenant_subnet_id=$(get_id quantum subnet-create --tenant_id $tenant_id $tenant_net_id 10.0.100.0/24)\n",
                     "prov_router_id=$(get_id quantum router-create --tenant_id $tenant_id $prov_router_name)\n",
                     "quantum router-interface-add $prov_router_id $tenant_subnet_id\n",
 
@@ -2012,14 +2328,13 @@
                     "pool_floating_end='7.7.7.150'\n",
                     "ext_net_bridge=br-ex\n",
 
-                    "ext_net_id=$(get_id quantum net-create $ext_net_name -- --router:external=True --provider:network_type gre --provider:segmentation_id 2)\n",
-                    "quantum subnet-create --ip_version 4 --allocation-pool start=$pool_floating_start,end=$pool_floating_end --gateway $ext_net_gateway $ext_net_id $ext_net_cidr -- --enable_dhcp=False\n",
+                    "ext_net_id=$(get_id quantum net-create --tenant-id $tenant_id $ext_net_name --router:external=True)\n",
+                    "quantum subnet-create --tenant-id $tenant_id --allocation-pool start=$pool_floating_start,end=$pool_floating_end --gateway $ext_net_gateway $ext_net_name $ext_net_cidr -- --enable_dhcp=False\n",
 
                     "router_id=$(get_id quantum router-show $prov_router_name)\n",
                     "ext_net_id=$(get_id quantum net-show $ext_net_name)\n",
-                    "quantum router-gateway-set $router_id $ext_net_id \n",
-                    
-                    "ip addr flush dev $ext_net_bridge\n"
+                    "quantum router-gateway-set $router_id $ext_net_id \n"
+
                   ]]},
                   "mode" : "000700",
                   "owner" : "ubuntu",
@@ -2050,7 +2365,7 @@
         },
         "Properties" : {
           "KeyName" : { "Ref" : "KeyName" },
-          "InstanceType": { "Ref": "ComputeInstanceType" },
+          "InstanceType": { "Ref": "QuantumInstanceType" },
           "ImageId" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AMI" ] },
           "AvailabilityZone" : { "Fn::FindInMap" : [ "AWSRegionMap", { "Ref" : "AWS::Region" }, "AZ" ] },
           "Tags" : [{ "Key" : "Name", "Value" : "Quantum" }],
@@ -2060,42 +2375,16 @@
                 "DeviceIndex" : "0"
               },
               {
-                "NetworkInterfaceId" : {"Ref" : "QuantumInterfacePublic"},
+                "NetworkInterfaceId" : {"Ref" : "QuantumInterfaceData"},
                 "DeviceIndex" : "1"
               },
               {
-                "NetworkInterfaceId" : {"Ref" : "QuantumInterfaceData"},
+                "NetworkInterfaceId" : {"Ref" : "QuantumInterfacePublic"},
                 "DeviceIndex" : "2"
               }],
           "Monitoring" : "false",
           "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
             "#! /bin/bash\n",
-
-            "echo \"auto eth1\n",
-            "iface eth1 inet dhcp\" >> /etc/network/interfaces\n",
-            "ifup eth1\n",
-            "echo \"auto eth2\n",
-            "iface eth2 inet dhcp\" >> /etc/network/interfaces\n",
-            "ifup eth2\n",
-
-            "route add default gw 10.0.1.1 eth1\n",
-            "route del default gw 10.0.0.1 eth0\n",
-            "route del default gw 10.0.2.1 eth2\n",
-
-            "echo \"10.0.0.13 `hostname`\" >> /etc/hosts\n",
-
-            "wget ", { "Ref" : "SSHpublicKeyURL" }, "\n",
-            "cat ./id_dsa.pub >> /home/ubuntu/.ssh/authorized_keys\n",
-               
-            "echo \"net.ipv4.ip_forward=1\n",
-            "net.ipv4.conf.all.rp_filter = 0\n",
-            "net.ipv4.conf.default.rp_filter = 0\" >> /etc/sysctl.conf\n",
-            "sysctl -p\n",
-
-            "apt-get install ubuntu-cloud-keyring\n",
-            "echo 'deb http://ubuntu-cloud.archive.canonical.com/ubuntu precise-updates/folsom main' > /etc/apt/sources.list.d/cloud-archive.list\n",
-            "echo 'APT::Get::AllowUnauthenticated \"true\";' >> /etc/apt/apt.conf.d/70debconf\n",
-            "apt-get update\n",
 
             "apt-get -y install python-setuptools\n",
             "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.1.tar.gz\n",
@@ -2126,17 +2415,13 @@
       "Value" : { "Fn::Join" : ["", ["http://", { "Ref" : "KeystoneIPAddress" }, "/horizon" ]] },
       "Description" : "Graphical interface URL"
     },
-    "QuantumIP" : {
-      "Value" : { "Ref" : "QuantumIPAddress" },
-      "Description" : "Quantum public IP (API)"
+    "NATIP" : {
+      "Value" : { "Ref" : "NATIPAddress" },
+      "Description" : "NAT IP address"
     },
     "NovaIP" : {
       "Value" : { "Ref" : "NovaIPAddress" },
       "Description" : "Nova public IP (API)"
-    },
-    "ComputeIP" : {
-      "Value" : { "Ref" : "ComputeIPAddress" },
-      "Description" : "Nova compute public IP (API)"
     },
     "CinderIP" : {
       "Value" : { "Ref" : "CinderIPAddress" },
