@@ -14,9 +14,9 @@ Table of Contents
 
   1. What is it?
   2. How to launch my stack ?
-  2. Pricing (AWS fees)
-  3. Development rules
-  4. Credits
+  3. Pricing (AWS fees)
+  4. Development rules
+  5. Credits
 
   
 Authors
@@ -32,7 +32,7 @@ OSonAWS is a set of template to quickly deploy an OpenStack cloud on Amazon Web 
 OSonAWS launch a stack with minimum 7 servers according to the fallowing schema. You can choose when you launch the stack the amount of storage and the number/power of Nova nodes.
 You can also add a swift cluster with the number of nodes and storage you want.
 
-1. How to launch my stack ?
+2. How to launch my stack ?
 ==============
 
 For launching the template in CloudFormation, please refer to INSTALL.rst [https://github.com/pfreund/OSonAWS/blob/master/doc/INSTALL.rst]
@@ -45,7 +45,11 @@ How does the VPC is configured ?
 ====================
 .. image:: https://raw.github.com/pfreund/OSonAWS/master/doc/readme_images/vpc.png
 
-2. Default configuration and pricing (USA East)
+Where are openstack services ?
+====================
+.. image:: https://raw.github.com/pfreund/OSonAWS/master/doc/readme_images/services.png
+
+3. Default configuration and pricing (USA East)
 ====================
 
 Openstack ressources available by default :
@@ -62,13 +66,13 @@ AWS ressources price :
 
 * Total : 0,88$ per hour.
 
-3. Development rules
+4. Development rules
 ====================
 
 * Only 1 file for launching a stack. No external files used in the template (wget, file section, etc)
 * No specific AMI. Only use Ubuntu 12.04.1 LTS AMI.
 
-4. Credits
+5. Credits
 =================
 
 This work has been based on:
