@@ -38,6 +38,7 @@ You can also add a swift cluster with the number of nodes and storage you want.
 ==============
 
 First, you should have an AWS account with access to CloudFormation and a valid keypair. If you don't, please fallow AWS Getting Started webpage :
+
    http://docs.amazonwebservices.com/AWSEC2/latest/UserGuide/EC2_GetStarted.html
 
 * Open this URL in a browser and save the file (File > Save as) :
@@ -52,15 +53,17 @@ First, you should have an AWS account with access to CloudFormation and a valid 
 * Click in "outputs" tab and click on the URL : "Horizon URL".
 * Connect on the dashboard with admin/password, or demo/password. Note that you can change demo login and passwords in the template parameters.
 
+!! Don't forget to SUPRESS your stack after use !!
+
 3. Parameters
 ==============
 
 What do I need to change ?
-========
+====================
 * Keyname : Put the name of your existing keypair
 
 What should I change ?
-====
+====================
 * CinderVolumeSize : If you need more Cinder space.
 * Passwords : mysql root, mysql user, service tenant, keystone admin token, Rabbit.
 * Horizon credentials : Demo/admin login and passwords.
@@ -100,17 +103,19 @@ Openstack ressources available by default :
 
 AWS ressources price :
 
-========= ====== ========== ===========
+===== ========= ====== ============ ===========
 
- Size     Number Unit price Total price
+Type  Size     Number Price         Total
 
- t1.micro 5      0,020      0,1
+EC2   t1.micro 5      0,020/hour    0,1
  
- m1.large 3      0,26       0,78
+EC2   m1.large 3      0,26/hour     0,78
 
-========= ====== ========== ===========
+EBS   standard 100 Go 0,10/Go/month 0,013
 
-Total : 0,88$/hour
+===== ========= ====== ============ ===========
+
+Total : around 1$/hour with traffic.
 
 6. Development rules
 ====================
