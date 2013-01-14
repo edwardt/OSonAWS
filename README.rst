@@ -60,11 +60,17 @@ Openstack ressources available by default :
 
 AWS ressources price :
 
-:Size: Number: Unit price: Total price
-:t1.micro: 5: 0,020: 0,1
-:m1.large: 3: 0,26: 0,78
+========= ====== ========== ===========
 
-* Total : 0,88$ per hour.
+ Size     Number Unit price Total price
+
+ t1.micro 5      0,020      0,1
+ 
+ m1.large 3      0,26       0,78
+
+========= ====== ========== ===========
+
+Total : 0,88$/hour
 
 4. Development rules
 ====================
