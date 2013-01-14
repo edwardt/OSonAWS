@@ -35,7 +35,20 @@ You can also add a swift cluster with the number of nodes and storage you want.
 2. How to launch my stack ?
 ==============
 
-For launching the template in CloudFormation, please refer to INSTALL.rst [https://github.com/pfreund/OSonAWS/blob/master/doc/INSTALL.rst]
+First, you should have an AWS account with access to CloudFormation and a valid keypair. If you don't, please fallow AWS Getting Started webpage :
+http://docs.amazonwebservices.com/AWSEC2/latest/UserGuide/EC2_GetStarted.html
+
+* Open this URL in a browser and save the file (File > Save as) :
+
+  https://raw.github.com/pfreund/OSonAWS/master/openstack.templatee
+
+* Open your AWS console and go to CloudFormation tab. Click "create new stack",
+* Give your stack a name and load the template you downloaded on step 1. Then press continue,
+* Find in the parameter list "Keyname" and give the name of your EC2 keypair. Check in the IAM ressource validation box,
+* Press continue until the end of the wizard.
+* Wait around 30 minutes and connect to OpenStack GUI via URL given in output tab of your stack.
+* Click in "outputs" tab and click on the URL : "Horizon URL".
+* Connect on the dashboard with admin/password, or demo/password. Note that you can change demo login and passwords in the template parameters.
 
 How to access VMs / GUI ?
 ====================
