@@ -31,8 +31,13 @@ OSonAWS is a set of template to quickly deploy an OpenStack cloud on Amazon Web 
 OSonAWS launch a stack with minimum 7 servers according to the fallowing schema. You can choose when you launch the stack the amount of storage and the number/power of Nova nodes.
 You can also add a swift cluster with the number of nodes and storage you want.
 
-.. image:: http://s3-ap-southeast-1.amazonaws.com/osonaws/howto/schema.png
-.. image:: http://s3-ap-southeast-1.amazonaws.com/osonaws/howto/network.png
+How to access VMs / GUI ?
+====================
+.. image:: https://raw.github.com/pfreund/OSonAWS/master/doc/readme_images/access.png
+
+How does the VPC is configured ?
+====================
+.. image:: https://raw.github.com/pfreund/OSonAWS/master/doc/readme_images/vpc.png
 
 2. Pricing
 ====================
