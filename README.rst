@@ -56,11 +56,11 @@ First, you should have an AWS account with access to CloudFormation and a valid 
 ==============
 
 What do I need to change ?
-====================
+========
 * Keyname : Put the name of your existing keypair
 
 What should I change ?
-====================
+====
 * CinderVolumeSize : If you need more Cinder space.
 * Passwords : mysql root, mysql user, service tenant, keystone admin token, Rabbit.
 * Horizon credentials : Demo/admin login and passwords.
