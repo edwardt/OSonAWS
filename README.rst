@@ -14,9 +14,11 @@ Table of Contents
 
   1. What is it?
   2. How to launch my stack ?
-  3. Pricing (AWS fees)
-  4. Development rules
-  5. Credits
+  3. Parameters
+  3. What will be installed ?
+  4. Pricing (AWS fees)
+  5. Development rules
+  6. Credits
 
   
 Authors
@@ -36,7 +38,7 @@ You can also add a swift cluster with the number of nodes and storage you want.
 ==============
 
 First, you should have an AWS account with access to CloudFormation and a valid keypair. If you don't, please fallow AWS Getting Started webpage :
-http://docs.amazonwebservices.com/AWSEC2/latest/UserGuide/EC2_GetStarted.html
+   http://docs.amazonwebservices.com/AWSEC2/latest/UserGuide/EC2_GetStarted.html
 
 * Open this URL in a browser and save the file (File > Save as) :
 
@@ -50,19 +52,44 @@ http://docs.amazonwebservices.com/AWSEC2/latest/UserGuide/EC2_GetStarted.html
 * Click in "outputs" tab and click on the URL : "Horizon URL".
 * Connect on the dashboard with admin/password, or demo/password. Note that you can change demo login and passwords in the template parameters.
 
-How to access VMs / GUI ?
-====================
-.. image:: https://raw.github.com/pfreund/OSonAWS/master/doc/readme_images/access.png
+3. Parameters
+==============
 
-How does the VPC is configured ?
+What do I need to change ?
 ====================
-.. image:: https://raw.github.com/pfreund/OSonAWS/master/doc/readme_images/vpc.png
+* Keyname : Put the name of your existing keypair
 
-Where are openstack services ?
+What should I change ?
+====================
+* CinderVolumeSize : If you need more Cinder space.
+* Passwords : mysql root, mysql user, service tenant, keystone admin token, Rabbit.
+* Horizon credentials : Demo/admin login and passwords.
+* Project Name : Name of the project in GUI.
+* SSH private/public key : used to connect between nodes via ssh.
+
+What can I change if I know what I'm doing ?
+====================
+* InstanceType : If you want larger OpenStack hosts (keystone, cinder, glance, nova).
+* ComputeInstanceType : Nova Compute size.
+* QuantumInstanceType : Quantum server size, please note that Quantum MUST have 3 ENI.
+
+4. What will be installed ?
+==============
+
+Services / hosts
 ====================
 .. image:: https://raw.github.com/pfreund/OSonAWS/master/doc/readme_images/services.png
 
-3. Default configuration and pricing (USA East)
+Access
+====================
+.. image:: https://raw.github.com/pfreund/OSonAWS/master/doc/readme_images/access.png
+
+VPC Configuration
+====================
+.. image:: https://raw.github.com/pfreund/OSonAWS/master/doc/readme_images/vpc.png
+
+
+5. Default configuration and pricing (USA East)
 ====================
 
 Openstack ressources available by default :
@@ -85,16 +112,16 @@ AWS ressources price :
 
 Total : 0,88$/hour
 
-4. Development rules
+6. Development rules
 ====================
 
 * Only 1 file for launching a stack. No external files used in the template (wget, file section, etc)
 * No specific AMI. Only use Ubuntu 12.04.1 LTS AMI.
 
-5. Credits
+7. Credits
 =================
 
-This work has been based on:
+These guides has been very helpful.
 
 * Emilien Macchi's Folsom guide [https://github.com/EmilienM/openstack-folsom-guide]
 * OpenStack Folsom Install Guide [https://github.com/mseknibilel/OpenStack-Folsom-Install-guide/blob/master/OpenStack_Folsom_Install_Guide_WebVersion.rst]
