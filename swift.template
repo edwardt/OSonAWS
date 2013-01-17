@@ -1,7 +1,7 @@
 {
   "AWSTemplateFormatVersion" : "2010-09-09",
 
-  "Description" : "OpenStack on Amazon web service template",
+  "Description" : "Swift on Amazon web service template",
 
   "Parameters" : {
  

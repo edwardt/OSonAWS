@@ -355,6 +355,15 @@
       }
     },
 
+    "RouteData" : {
+      "Type" : "AWS::EC2::Route",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "RouteTableData" },
+        "DestinationCidrBlock" : "0.0.0.0/0",
+        "InstanceId" : { "Ref" : "NATServer" }
+      }
+    },
+
     "SubnetRouteTableAssociationData" : {
       "Type" : "AWS::EC2::SubnetRouteTableAssociation",
       "Properties" : {
@@ -1431,7 +1440,7 @@
                     "ec2_private_dns_show_ip=True\n",
                     "dmz_cidr=169.254.169.254/32\n",
                     "ec2_dmz_host=10.0.0.14\n",
-                    "metadata_host=10.0.0.14\n",
+                    "metadata_host=10.0.2.14\n",
                     "metadata_listen=0.0.0.0\n",
                     "enabled_apis=ec2,osapi_compute,metadata\n",
 
@@ -1445,7 +1454,7 @@
                     "quantum_admin_auth_url=http://10.0.0.10:35357/v2.0\n",
                     "libvirt_vif_driver=nova.virt.libvirt.vif.LibvirtHybridOVSBridgeDriver\n",
                     "linuxnet_interface_driver=nova.network.linux_net.LinuxOVSInterfaceDriver  \n",
-                    "firewall_driver=nova.virt.libvirt.firewall.IptablesFirewallDriver\n",
+                    "firewall_driver=nova.virt.firewall.NoopFirewallDriver\n",
 
                     "# Compute #\n",
                     "compute_driver=libvirt.LibvirtDriver\n",
@@ -1534,7 +1543,6 @@
                 "packages" : {
                   "apt" : {
                     "quantum-server"                      : [],
-                    "quantum-plugin-openvswitch-agent"    : [],
                     "vlan"                                : [],
                     "bridge-utils"                        : []
                   }
@@ -1805,7 +1813,7 @@
                     "ec2_private_dns_show_ip=True\n",
                     "dmz_cidr=169.254.169.254/32\n",
                     "ec2_dmz_host=10.0.0.14\n",
-                    "metadata_host=10.0.0.14\n",
+                    "metadata_host=10.0.2.14\n",
                     "metadata_listen=0.0.0.0\n",
                     "enabled_apis=emetadata\n",
 
@@ -2145,7 +2153,7 @@
                     "iface eth1 inet dhcp\" >> /etc/network/interfaces\n",
                     "ifup eth1\n",
                     "#route add -net default gw 10.0.1.1 eth1\n",
-                    "echo \"auto eth1\n",
+                    "echo \"auto eth2\n",
                     "iface eth2 inet dhcp\" >> /etc/network/interfaces\n",
                     "ifup eth2\n",
                     "#route add -net default gw 10.0.2.1 eth2\n",
@@ -2194,9 +2202,9 @@
                     "ovs-vsctl add-br br-eth1\n",
                     "ovs-vsctl add-port br-eth1 eth1\n",
 
-                    "#br-ex is used to make to VM accessible from the internet\n",
+                    "#br-ex is used to make VM accessible from the internet\n",
                     "ovs-vsctl add-br br-ex\n",
-                    "ovs-vsctl add-port br-ex eth2\n"
+                    "ovs-vsctl add-port br-ex eth2\n" 
                   ]]},
                   "mode" : "000700",
                   "owner" : "ubuntu",
@@ -2274,7 +2282,7 @@
                     "sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/quantum/l3_agent.ini\n",
                     "sed -i 's/%SERVICE_USER%/quantum/g' /etc/quantum/l3_agent.ini\n",
                     "sed -i 's/%SERVICE_PASSWORD%/", { "Ref" : "ServicePassword" }, "/g' /etc/quantum/l3_agent.ini\n",
-                    "echo 'metadata_ip = 10.0.0.14\n",
+                    "echo 'metadata_ip = 10.0.2.14\n",
                     "metadata_port = 8775\n",
                     "use_namespaces=False' >> /etc/quantum/l3_agent.ini\n",
 
@@ -2327,13 +2335,14 @@
                     "pool_floating_start='7.7.7.130'\n",
                     "pool_floating_end='7.7.7.150'\n",
                     "ext_net_bridge=br-ex\n",
+                    "tenant_service_id=$(keystone tenant-list | grep service | awk '{print $2}')\n",
 
-                    "ext_net_id=$(get_id quantum net-create --tenant-id $tenant_id $ext_net_name --router:external=True)\n",
-                    "quantum subnet-create --tenant-id $tenant_id --allocation-pool start=$pool_floating_start,end=$pool_floating_end --gateway $ext_net_gateway $ext_net_name $ext_net_cidr -- --enable_dhcp=False\n",
+                    "ext_net_id=$(get_id quantum net-create --tenant-id $tenant_service_id $ext_net_name --router:external=True)\n",
+                    "quantum subnet-create --tenant-id $tenant_service_id --allocation-pool start=$pool_floating_start,end=$pool_floating_end --gateway $ext_net_gateway $ext_net_name $ext_net_cidr -- --enable_dhcp=False\n",
 
                     "router_id=$(get_id quantum router-show $prov_router_name)\n",
                     "ext_net_id=$(get_id quantum net-show $ext_net_name)\n",
-                    "quantum router-gateway-set $router_id $ext_net_id \n"
+                    "quantum router-gateway-set $router_id $ext_net_id\n"
 
                   ]]},
                   "mode" : "000700",
