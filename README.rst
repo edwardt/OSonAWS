@@ -1,3 +1,6 @@
+!! WARNING, openstack.template does not work yet, due to a network problem. You can launch the stack, connect to the GUI, but openstack instances does not start properly !!
+
+
 ==========================================================
   OpenStack over Amazon Web Services
 ==========================================================
